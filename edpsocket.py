@@ -10,7 +10,7 @@ SENT_SIZE = DATA_LENGTH + 5000  # Pickled objects take a lot of space
 LAST_CONNECTION = -1
 FIRST = 0
 
-class edtpacket(object):
+class edppacket(object):
     def __init__(self):
         self.version = 1.0
         #self.length = 0
@@ -37,7 +37,7 @@ class edtpacket(object):
     def __cmp__(self,other):
         return cmp(self.seq, other.seq)
 
-class edtsocket(object,timeout = 5):
+class edpsocket(object,timeout = 5):
     def __init__(self):
         self.status = 1 # socket open or closed
         self.own_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) #UDP socket

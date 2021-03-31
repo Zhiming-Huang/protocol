@@ -3,7 +3,7 @@ import socket
 import struct
 
 
-class edtpacket:
+class edppacket:
     def __init__(self,version,connection_type, checksum=0, ack=0, seq = 0, win = 0, control = {'1':0,'2':0,'3':0}):
           self.version = version
           self.type = connection_type #1 for control, 2 for ack...

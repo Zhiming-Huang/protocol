@@ -1,5 +1,6 @@
 import edtpacket
 import threading
+import time
 
 files = "sadasasdsd"
 socket.socket()
@@ -39,7 +40,7 @@ ooo_packet_queue = {}  # Out of order packet buffer
 
 
 fsmstate = "CLOSED" #initially the connection is closed, 
-# "SND_CONNECTED" for a harf connection from the sender to the receiver (i.e., sender can send data to the receiver)
+# "SEMI_CONNECTED" for a harf connection from the sender to the receiver (i.e., sender can send data to the receiver)
 # "CONNECTED" for a full connection between the sender and the receiver
 
 def connection_coontrol_set():
@@ -60,10 +61,11 @@ def connection_coontrol_set():
 
 
 def ConnectionCreate(connectiontype, address):
-	success = False
-
-	if success
+	if connectiontype == 0:
 		return True
+
+	event_connect.acquire()
+	return state == "SEMI_CONNECTED" or state == "CONNECTED"
 
 def Data_transmission(controltype, address):
 
@@ -79,3 +81,5 @@ def connection_close(connectiontype, address):
 def transmit_data():
 #send out data segment from TX buffer using sliding window mechanism
 	
+def edp_fsm(packet=None, syscall = None, timer = False)
+#run edp fsm
