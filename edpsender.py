@@ -80,6 +80,19 @@ def connection_close(connectiontype, address):
 
 def transmit_data():
 #send out data segment from TX buffer using sliding window mechanism
+
+
 	
-def edp_fsm(packet=None, syscall = None, timer = False)
+def edp_fsm(packet=None, syscall = None, timer = False):
+	#process event
+	with lock_fsm:
+		return {
+		"CLOSED": _edp_fsm_closed
+		"CTL_SENT": _edp_fsm_CTL_SET
+		"CTL_RCVD": _edp_fsm_CTL_SET
+		""
+		}
+
+
+
 #run edp fsm

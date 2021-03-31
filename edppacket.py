@@ -33,4 +33,7 @@ class edppacket:
              )
 
     def bytes2packet(buffer):
+      #given the string of bytes, recover the packet
+      
+
 
