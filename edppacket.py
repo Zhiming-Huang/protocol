@@ -17,6 +17,7 @@ class edppacket:
           self.raw = None
 
     def packet2bytes(self):
+      #given the type of the packet, output the bytes format
           if self.type == 0x001: #control packet
              self.length = 
              self.raw = struct.pack('!BBBBBLLLL',
