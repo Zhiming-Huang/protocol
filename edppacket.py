@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 
 import socket
 import struct
@@ -14,15 +14,15 @@ class edppacket:
           # self.src = src
           # self.dst = dst
           self.length_common = 9
-          self.checksum = checksum
+          self.checksum = 0
 
           # ACK header
           #  |ack|wnd|flags|mMTU|
           #  |4B |2B | 1B  | 2B |
           self.ack = 0
           self.wnd = 0
-          self.flags = flags
-          self.mMTU = mMTU
+          self.flags = 0
+          self.mMTU = 0
 
           #Control header
           #  |ctr_length|ctr_mech| ... |ctr_mech|
@@ -41,33 +41,33 @@ class edppacket:
           self.raw = None
     
     # Set ack_header
-    def set_ack_header(ack, wnd, flags, mMTU):
+    def set_ack_header(self, ack, wnd, flags, mMTU):
         self.ack = struct.pack('!L', ack)
         self.wnd = struct.pack('!H',wnd)
         self.flags = struct.pack('!B',flags)
         self.mMTU = struct.pack('!H',mMTU)
     
     # set ctr_header
-    def set_ctr_header(ctr_length, ctr_mech):
+    def set_ctr_header(self, ctr_length, ctr_mech):
         self.ctr_length = struct.pack('!B', ctr_length)
         for i in range(ctr_length):
           self.ctr_mech = self.ctr_mech + struct.pack('!BB', ctr_mech[2*i], ctr_mech[2*i+1])
 
     # set data_header
-    def set_data_header(seq, data_length, DAT):
+    def set_data_header(self, seq, data_length, DAT):
         self.seq = struct.pack('!L', seq)
         self.data_length = struct.pack('!H', data_length)
         self.DAT = DAT.encode()
           
     # Generate bytes of packet
-    def packet2bytes(self,):
+    def packet2bytes(self):
           #Generate common header bytes format
           temp = struct.pack('!BHHBBH',
           self.version,
-          self.src,
-          self.dst,
+          #self.src,
+          #self.dst,
           self.packet_type,
-          self.length,
+          self.length_common,
           self.checksum
           )
           self.raw = self.raw + temp
@@ -92,24 +92,24 @@ class edppacket:
 
 
 
-    def bytes2packet(packet): 
+    def bytes2packet(self, packet): 
           #given the string of bytes, recover the packet
           packet = packet[0]
           # parse IP header
-          ip_header = packet[0:20]
-          iph = struct.unpack('!BBHHHBBH4s4s', ip_header)
+          # ip_header = packet[0:20]
+          # iph = struct.unpack('!BBHHHBBH4s4s', ip_header)
           # all the following values are incorrect
-          version_ihl = iph[0]
-          version = version_ihl >> 4
-          inh = version_ihl & 0xF
-          ttl = iph[5]
-          protocol = iph[6]
-          s_addr = socket.inet_ntoa(iph[8])
-          d_addr = socket.inet_ntoa(iph[9])
+          # version_ihl = iph[0]
+          # version = version_ihl >> 4
+          # inh = version_ihl & 0xF
+          # ttl = iph[5]
+          # protocol = iph[6]
+          # s_addr = socket.inet_ntoa(iph[8])
+          # d_addr = socket.inet_ntoa(iph[9])
 
           # parse UDP header
-          udp_header = packet[20:28]
-          source_port, dest_port, data_length, checksum = struct.unpack("!HHHH",udp_header)
+          # udp_header = packet[20:28]
+          # source_port, dest_port, data_length, checksum = struct.unpack("!HHHH",udp_header)
 
           # parse edp common header
           packet = packet[28]
@@ -120,11 +120,21 @@ class edppacket:
             packet = packet[5]
             edp_ack_header = packet[0:9]
             self.ack, self.wnd, self.flags, self.mMTU = struct.unpack('!4sHBH',edp_ack_header)
-            packet = pakcet[9]
+            packet = packet[9]
           
           if self.packet_type & 0b010:
             edp_control_header_1 = packet[0:1]
-            self.ctr_length = struct.unpack('!B',edp_control_header_1)
+            self.ctr_length = struct.unpack('!B', edp_control_header_1)
+            for i in range(self.ctr_length):
+              edp_control_header_2_temp = packet[2*i+1, 2*i]
+              self.ctr_mech += struct.unpack('!BB', edp_control_header_2_temp)
+            packet = packet[2*self.ctr_length]
+
+            if self.packet_type & 0b100:
+              edp_data_header = packet[0:6]
+              self.seq, self.data_length = struct.unpack('!4sH',edp_data_header)
+              packet = packet[6]
+              self.DAT = packet
 
 
 
