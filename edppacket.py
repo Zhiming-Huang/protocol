@@ -5,7 +5,7 @@ import struct
 
 
 class edppacket:
-    def __init__(self):
+    def __init__(self, version, packet_type):
           # common header
           #  |Version|packet_type|length|checksum|
           #  |  1B   |    1B     |  1B  |   2B   |
@@ -142,11 +142,11 @@ class edppacket:
               self.ctr_mech += struct.unpack('!BB', edp_control_header_2_temp)
             packet = packet[2*self.ctr_length]
 
-            if self.packet_type & 0b100:
-              edp_data_header = packet[0:6]
-              self.seq, self.data_length = struct.unpack('!4sH',edp_data_header)
-              packet = packet[6]
-              self.DAT = packet
+          if self.packet_type & 0b100:
+            edp_data_header = packet[0:6]
+            self.seq, self.data_length = struct.unpack('!4sH',edp_data_header)
+            packet = packet[6]
+            self.DAT = packet
 
 
 
