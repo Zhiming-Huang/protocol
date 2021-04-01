@@ -128,8 +128,8 @@ def transmit_packet(seq=None,packet_type=None,flag_fin=False,controltype={}, dat
 
 def tranmit_data():
 	if fsmstate == "CTL_SENT" and snd_nxt == snd_ini: #check if we need to (re)send inital control packet
-		transmit_packet(packet_type = 1)
-		_control_sent_process()
+		packet_to_send = transmit_packet(packet_type = 1)
+		_control_sent_process(packet_to_send)
 		return
 
 
@@ -139,12 +139,16 @@ def tranmit_data():
 
 	if fsmstate in {"CLOSE_WAIT"}:#check if we need to (re)transmit the final fin packet
 
-def _control_sent_process():
+def _control_sent_process(packet):
 	if _process_ack_packet(packet)
-	event_connect.release()
+		event_connect.release()
 
 
 	_retransmt_packet_timeout()
+
+def _process_ack_packet(packet):
+	snd_una = max(snd_una,packet.ack)
+
 
 def _retransmt_packet_timeout():
 	global fsmstate
