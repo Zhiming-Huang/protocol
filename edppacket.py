@@ -5,20 +5,20 @@ import struct
 
 
 class edppacket:
-    def __init__(self, packet_type, version, src, dst, type):
+    def __init__(self, packet_type, version, type):
           # common header
-          #  |Version|src|dst|packet_type|length|checksum|
-          #  |  1B   |2B |2B |     1B    |  1B  |   2B   |
-          self.packet_type = packet_type  # 0b001 for ACK, 0b010 for Control, 0b100 for data
+          #  |Version|packet_type|length|checksum|
+          #  |  1B   |    1B     |  1B  |   2B   |
           self.version = version
-          self.src = src
-          self.dst = dst
+          self.packet_type = packet_type  # 0b001 for ACK, 0b010 for Control, 0b100 for data
+          # self.src = src
+          # self.dst = dst
           self.length_common = 9
           self.checksum = checksum
 
           # ACK header
           #  |ack|wnd|flags|mMTU|
-          #  |4B |2B | 1B  |    |
+          #  |4B |2B | 1B  | 2B |
           self.ack = 0
           self.wnd = 0
           self.flags = flags
@@ -73,7 +73,7 @@ class edppacket:
           self.raw = self.raw + temp
 
           # Generate ACK header
-          if self.packt_type & 0b001 : # ACK packet
+          if self.packet_type & 0b001 : # ACK packet
              temp = struct.pack('!BHHBBH',
              self.ack,
              self.wnd,
@@ -92,7 +92,43 @@ class edppacket:
 
 
 
-    def bytes2packet(buffer): 
-      #given the string of bytes, recover the packet
+    def bytes2packet(packet): 
+          #given the string of bytes, recover the packet
+          packet = packet[0]
+          # parse IP header
+          ip_header = packet[0:20]
+          iph = struct.unpack('!BBHHHBBH4s4s', ip_header)
+          # all the following values are incorrect
+          version_ihl = iph[0]
+          version = version_ihl >> 4
+          inh = version_ihl & 0xF
+          ttl = iph[5]
+          protocol = iph[6]
+          s_addr = socket.inet_ntoa(iph[8])
+          d_addr = socket.inet_ntoa(iph[9])
+
+          # parse UDP header
+          udp_header = packet[20:28]
+          source_port, dest_port, data_length, checksum = struct.unpack("!HHHH",udp_header)
+
+          # parse edp common header
+          packet = packet[28]
+          edp_common_header = packet[0:5]
+          self.version, self.packet_type, self.length, self.checksum = struct.unpack("!BBBH", edp_common_header)
+          # parse the optional header
+          if self.packet_type & 0b001:
+            packet = packet[5]
+            edp_ack_header = packet[0:9]
+            self.ack, self.wnd, self.flags, self.mMTU = struct.unpack('!4sHBH',edp_ack_header)
+            packet = pakcet[9]
+          
+          if self.packet_type & 0b010:
+            edp_control_header_1 = packet[0:1]
+            self.ctr_length = struct.unpack('!B',edp_control_header_1)
+
+
+
+
+
       
 
