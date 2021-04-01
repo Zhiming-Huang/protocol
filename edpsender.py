@@ -129,6 +129,7 @@ def transmit_packet(seq=None,packet_type=None,flag_fin=False,controltype={}, dat
 def tranmit_data():
 	if fsmstate == "CTL_SENT" and snd_nxt == snd_ini: #check if we need to (re)send inital control packet
 		transmit_packet(packet_type = 1)
+		_retransmt_packet_timeout()
 		return
 
 
@@ -139,7 +140,11 @@ def tranmit_data():
 	if fsmstate in {"CLOSE_WAIT"}:#check if we need to (re)transmit the final fin packet
 
 def _retransmt_packet_timeout():
-	if snd_una in tx_retransmit_timeout_counter and
+	global fsmstate
+	if snd_una in tx_retransmit_timeout_counter and timers(snd_una):
+		if tx_retransmit_timeout_counter[snd_una] == PACKET_RETRANSMIT_MAX_COUNT:
+			#If in any state with established connection connection inform socket about connection failure
+			
 
 
 
@@ -190,8 +195,11 @@ def run_fsm():
 		edp_fsm(main_thread=True)
 
 ###### the followings are some funcitons to assist contol machanisms #############
-def tx_buffer_nxt(self):
+def tx_buffer_nxt():
 	return max(snd_nxt - tx_buffer_seq_mod,0)
+
+def tx_buffer_una():
+	return max(snd_una - tx_buffer_seq_mod,0)
 
 threading.Thread(target=run_fsm).start()
 
