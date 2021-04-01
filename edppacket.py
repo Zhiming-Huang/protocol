@@ -1,39 +1,98 @@
-#!/usr/bin/python
+#!/usr/bin/python3
+
 import socket
 import struct
 
 
 class edppacket:
-    def __init__(self,version,connection_type, checksum=0, ack=0, seq = 0, win = 0, control = {'1':0,'2':0,'3':0}):
+    def __init__(self, packet_type, version, src, dst, type):
+          # common header
+          #  |Version|src|dst|packet_type|length|checksum|
+          #  |  1B   |2B |2B |     1B    |  1B  |   2B   |
+          self.packet_type = packet_type  # 0b001 for ACK, 0b010 for Control, 0b100 for data
           self.version = version
-          self.type = connection_type #1 for control, 2 for ack...
-          self.DAT = data
-          self.ack = ack
-          self.seq = seq
-          self.win = win
+          self.src = src
+          self.dst = dst
+          self.length_common = 9
           self.checksum = checksum
-          self.control ={}
-          self.Length = 0
+
+          # ACK header
+          #  |ack|wnd|flags|mMTU|
+          #  |4B |2B | 1B  |    |
+          self.ack = 0
+          self.wnd = 0
+          self.flags = flags
+          self.mMTU = mMTU
+
+          #Control header
+          #  |ctr_length|ctr_mech| ... |ctr_mech|
+          #  |    1B    |   1B   | ... |   1B   |
+          self.ctr_length = 0
+          self.ctr_mech = []
+
+          #Data header
+          #  |seq#|data_length|Payload|
+          #  | 4B |     2B    |       |
+          self.seq = 0
+          self.data_length = 0
+          self.DAT = 0  
+          
+          # self.Length = 0
           self.raw = None
+    
+    # Set ack_header
+    def set_ack_header(ack, wnd, flags, mMTU):
+        self.ack = struct.pack('!L', ack)
+        self.wnd = struct.pack('!H',wnd)
+        self.flags = struct.pack('!B',flags)
+        self.mMTU = struct.pack('!H',mMTU)
+    
+    # set ctr_header
+    def set_ctr_header(ctr_length, ctr_mech):
+        self.ctr_length = struct.pack('!B', ctr_length)
+        for i in range(ctr_length):
+          self.ctr_mech = self.ctr_mech + struct.pack('!BB', ctr_mech[2*i], ctr_mech[2*i+1])
 
-    def packet2bytes(self):
-      #given the type of the packet, output the bytes format
-          if self.type == 0x001: #control packet
-             self.length = 
-             self.raw = struct.pack('!BBBBBLLLL',
-             self.version, 
-             self.length,
-             self.FIN ,
-             self.DAT ,
-             self.ACK ,
-             self.Sequence, 
-             self.Acknowledgement, 
-             self.Window ,
-             self.Length ,
+    # set data_header
+    def set_data_header(seq, data_length, DAT):
+        self.seq = struct.pack('!L', seq)
+        self.data_length = struct.pack('!H', data_length)
+        self.DAT = DAT.encode()
+          
+    # Generate bytes of packet
+    def packet2bytes(self,):
+          #Generate common header bytes format
+          temp = struct.pack('!BHHBBH',
+          self.version,
+          self.src,
+          self.dst,
+          self.packet_type,
+          self.length,
+          self.checksum
+          )
+          self.raw = self.raw + temp
+
+          # Generate ACK header
+          if self.packt_type & 0b001 : # ACK packet
+             temp = struct.pack('!BHHBBH',
+             self.ack,
+             self.wnd,
+             self.flags,
+             self.mMTU
              )
+             self.raw = self.raw + temp
 
-    def bytes2packet(buffer):
+          # Generate Control header
+          if self.packet_type & 0b010: #control packet
+             self.raw = self.raw + self.ctr_length + self.ctr_mech
+            
+          # Generate DATA header
+          if self.packet_type & 0b100:
+             self.raw = self.raw + self.seq + self.data_length +self.DAT
+
+
+
+    def bytes2packet(buffer): 
       #given the string of bytes, recover the packet
       
-
 
