@@ -104,7 +104,7 @@ def transmit_packet(seq=None,packet_type=None,flag_fin=False,controltype={}, dat
 	edppacket.set_controltype = controltype
 	packet_to_send.packet2bytes()
 	with lock_socket:
-		s.sendto(first_ctl_packet,address)
+		s.sendto(packet_to_send,address)
 	snd_nxt = seq + len(data) + flag_ctl +flag_fin
 	snd_max = max(snd_max,snd_nxt)
 	tx_buffer_seq_mod += flag_ctl + flag_fin
@@ -121,7 +121,7 @@ def transmit_packet(seq=None,packet_type=None,flag_fin=False,controltype={}, dat
 	if data or flag_ctl or flag_fin:
 		tx_retransmit_timeout_counter[seq] = tx_retransmit_timeout_counter.get(seq, -1) + 1
 		timers[seq] = PACKET_RETRANSMIT_TIMEOUT * (1 << tx_retransmit_timeout_counter[seq])
-
+	return packet_to_send
 
 
 
@@ -129,7 +129,7 @@ def transmit_packet(seq=None,packet_type=None,flag_fin=False,controltype={}, dat
 def tranmit_data():
 	if fsmstate == "CTL_SENT" and snd_nxt == snd_ini: #check if we need to (re)send inital control packet
 		transmit_packet(packet_type = 1)
-		_retransmt_packet_timeout()
+		_control_sent_process()
 		return
 
 
@@ -139,12 +139,19 @@ def tranmit_data():
 
 	if fsmstate in {"CLOSE_WAIT"}:#check if we need to (re)transmit the final fin packet
 
+def _control_sent_process():
+	if _process_ack_packet(packet)
+	event_connect.release()
+
+
+	_retransmt_packet_timeout()
+
 def _retransmt_packet_timeout():
 	global fsmstate
 	if snd_una in tx_retransmit_timeout_counter and timers(snd_una):
 		if tx_retransmit_timeout_counter[snd_una] == PACKET_RETRANSMIT_MAX_COUNT:
 			#If in any state with established connection connection inform socket about connection failure
-			
+
 
 
 
