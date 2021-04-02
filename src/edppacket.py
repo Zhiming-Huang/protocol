@@ -9,8 +9,8 @@ class edppacket:
           # common header
           #  |Version|packet_type|length|checksum|
           #  |  1B   |    1B     |  1B  |   2B   |
-          self.version = 0
-          self.packet_type = 0  # 0b001 for ACK, 0b010 for Control, 0b100 for data
+          self.version = version
+          self.packet_type = packet_type  # 0b001 for ACK, 0b010 for Control, 0b100 for data
           # self.src = src
           # self.dst = dst
           self.length_common = 9

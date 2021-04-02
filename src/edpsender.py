@@ -100,8 +100,8 @@ def transmit_packet(seq=None,packet_type=None,flag_fin=False,controltype={}, dat
 	ack = rcv_nxt if flag_ack else 0 
 	packet_to_send = edppacket(packet_type = 1,seq)
 	if ack:
-		edppacket.setack(ack)
-	edppacket.set_controltype = controltype
+		packet_to_send.setack(ack)
+	packet_to_send.set_controltype = controltype
 	packet_to_send.packet2bytes()
 	with lock_socket:
 		s.sendto(packet_to_send,address)
