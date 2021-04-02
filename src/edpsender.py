@@ -19,12 +19,7 @@ DELAYED_ACK_DELAY = xxx
 PACKET_RETRANSMIT_TIMEOUT
 timers = {}
 
-
-# Receiving window parameters
-rcv_ini = 1  # Initial ack number
-rcv_nxt = None # Next seq to be received
-rcv_wnd = 4096
-
+print("transmit finished")
 #sending window parameters
 snd_ini = 0 #Initial seq number
 snd_nxt = snd_ini #the next seq number to send
@@ -102,9 +97,10 @@ def transmit_packet(seq=None,packet_type=None,flag_fin=False,controltype={}, dat
 	if ack:
 		packet_to_send.setack(ack)
 	packet_to_send.set_controltype = controltype
+	#set packets ????
 	packet_to_send.packet2bytes()
 	with lock_socket:
-		s.sendto(packet_to_send,address)
+		s.sendto(packet_to_send.raw,address)
 	snd_nxt = seq + len(data) + flag_ctl +flag_fin
 	snd_max = max(snd_max,snd_nxt)
 	tx_buffer_seq_mod += flag_ctl + flag_fin
@@ -202,7 +198,8 @@ def  _edp_fsm_SEMI_CONNECTED(packet,syscall,main_thread):
 def run_fsm():
 	while True:
 		time.sleep(0.01)
-		timeout -= 1
+		for name in timers:
+			timers[name] -= 1
 		edp_fsm(main_thread=True)
 
 ###### the followings are some funcitons to assist contol machanisms #############
