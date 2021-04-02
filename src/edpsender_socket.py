@@ -126,6 +126,7 @@ class edpsender_socket(self):
 
 
 	def tranmit_data(self):
+		# add data to the send buffer
 		if self.fsmstate == "CTL_SENT" and self.snd_nxt == self.snd_ini: #check if we need to (re)send inital control packet
 			packet_to_send = transmit_packet(packet_type = 1)
 			_control_sent_process(packet_to_send)
@@ -139,13 +140,14 @@ class edpsender_socket(self):
 		if fsmstate in {"CLOSE_WAIT"}:#check if we need to (re)transmit the final fin packet
 
 	def _control_sent_process(self,packet):
-		if _process_ack_packet(packet)
+		if _process_ack_packet()
 			self.event_connect.release()
 
 
 		_retransmt_packet_timeout()
 
 	def _process_ack_packet(self,packet):
+		self.udpsocket.recvfrom()
 		self.snd_una = max(snd_una,packet.ack)
 
 
@@ -228,6 +230,7 @@ class edpsender_socket(self):
         answer = answer >> 8 | (answer << 8 & 0xff00)
         return answer
 
+    def 
 
 	
 
