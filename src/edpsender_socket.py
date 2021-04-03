@@ -6,6 +6,10 @@ PACKET_RETRANSMIT_MAX_COUNT = 3 # If data is not acked, the maxi time to resend
 PACKET_RETRANSMIT_TIMEOUT = 1000 # Time to retransmit a packet if ACK not received
 
 
+<<<<<<< HEAD
+fsmstate = "_edp_fsm_CTL_SNDCLOSED" #initially the connection is closed, 
+#"SND_CONNECTED" for single-directed connection from sender to the receiver (i.e., sender can send data to the receiver)
+=======
 class edpsender_socket(self):
 #s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 	#addresses = (ip,port)
@@ -17,7 +21,12 @@ class edpsender_socket(self):
 	self.fsmstate = "CLOSED" #initially the connection is closed, 
 	#"SND_CONNECTED" for single-directed connection from sender to the receiver (i.e., sender can send data to the receiver)
 	self.address = None
+<<<<<<< HEAD
 	self.connectiontype = {}
+=======
+>>>>>>> 5f02f23dfe0d8b25715c4f7e61ff9b5ad897a2f4
+
+>>>>>>> f1acd8a2ed555385887cb89befa7e855b98e5009
 	self.DELAYED_ACK_DELAY = 200
 	self.PACKET_RETRANSMIT_TIMEOUT = 200
 	self.timers = {}
@@ -70,7 +79,39 @@ class edpsender_socket(self):
 
 	# def packetgeneration(packettype,controltype,data):
 
+<<<<<<< HEAD
+# 	return bytes
+
+
+def ConnectionCreate(connectiontype, address):
+	if connectiontype == _edp_fsm_CTL_SNDacket(packet_type = 1,seq)
+	if ack:
+		packet_to_send.setack(ack)
+	packet_to_send.set_controltype = controltype
+	#set packets ????
+	packet_to_send.packet2bytes()
+	with lock_socket:
+		s.sendto(packet_to_send.raw,address)
+	snd_nxt = seq + len(data) + flag_ctl +flag_fin
+	snd_max = max(snd_max,snd_nxt)
+	tx_buffer_seq_mod += flag_ctl + flag_fin
+
+	#In case packet caries FIN flag make note of its SEQ number
+	if flag_fin:
+		snd_fin = snd_nxt
+
+	# If in (SEMI-)CONNECTION state then reset ACK delay timer
+	if fsmstate == "SEMI_CONNECTED":
+		timeout = DELAYED_ACK_DELAY
+
+	# If packet contains data then Initialize / adjust packet's retransmit counter and timer
+	if data or flag_ctl or flag_fin:
+		tx_retransmit_timeout_counter[seq] = tx_retransmit_timeout_counter.get(seq, -1) + 1
+		timers[seq] = PACKET_RETRANSMIT_TIMEOUT * (1 << tx_retransmit_timeout_counter[seq])
+	return packet_to_send
+=======
 	# 	return bytes
+>>>>>>> 5f02f23dfe0d8b25715c4f7e61ff9b5ad897a2f4
 
 
 	def connect(self,connectiontype, address):
