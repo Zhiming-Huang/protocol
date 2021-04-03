@@ -38,7 +38,7 @@ class edppacket(object):
           #  | L  |     H     |       |
           self.seq = 0
           self.data_length = 0
-          self.DAT = b''  
+          self.DAT = []  
           
           # self.Length = 0
           self.raw = b''
@@ -76,7 +76,7 @@ class edppacket(object):
     def set_data_header(self, seq, data_length, DAT):
         self.seq = seq
         self.data_length = data_length
-        self.DAT = DAT.encode()
+        self.DAT = DAT
           
     # Generate bytes of packet
     def packet2bytes(self):
@@ -111,7 +111,7 @@ class edppacket(object):
           if self.packet_type & 0b100:
              temp = struct.pack('!LH', self.seq, self.data_length)
              self.raw = self.raw + temp
-             self.raw += self.DAT
+             self.raw += self.DAT.encode()
 
 
 
@@ -164,9 +164,29 @@ class edppacket(object):
             edp_data_header = packet[0:6]
             self.seq, self.data_length = struct.unpack('!LH',edp_data_header)
             packet = packet[6:]
-            self.DAT = packet
+            self.DAT = packet.decode()
 
-
+    def generate_checksum(self):
+        source_string = self.DAT
+        # print(len(source_string))
+        # print(source_string)
+        my_sum = 0
+        count_to = int((len(source_string) / 2)) * 2
+        # print(count_to)
+        count = 0
+        while count < count_to:
+            this_val = ord(source_string[count + 1])*256+ord(source_string[count])
+            my_sum += this_val
+            count += 2
+        if count_to < len(source_string):
+            my_sum += ord(source_string[len(source_string) - 1])
+        my_sum = (my_sum >> 16) + (my_sum & 0xffff)
+        my_sum += (my_sum >> 16)
+        answer = ~my_sum
+        answer = answer & 0xffff
+        answer = answer >> 8 | (answer << 8 & 0xff00)
+        self.checksum = answer
+        #return answer
 
 
 

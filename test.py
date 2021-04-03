@@ -22,6 +22,7 @@ if edp_packet.packet_type & 0b010:
     edp_packet.set_ctr_header(ctr_length, ctr_mech)
 if edp_packet.packet_type & 0b100:
     edp_packet.set_data_header(seq, data_length, DAT)
+    edp_packet.generate_checksum()
 
 
 edp_packet.packet2bytes()
@@ -30,4 +31,9 @@ edp_packet.bytes2packet(edp_packet.raw)
 print(edp_packet.seq)
 print(edp_packet.data_length)
 print(edp_packet.mMTU)
-print(edp_packet.DAT)
+print(type(edp_packet.DAT))
+
+
+#print(edp_packet.checksum)
+
+
