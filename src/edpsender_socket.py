@@ -271,7 +271,7 @@ class edpsender_socket(self):
 			self._transmit_data()
 			return
 
-		if package and packet_type & 0b001: #receive ACK
+		if packet and packet_type & 0b001: #receive ACK
 			if self.snd_una <=packet.ack<=self.snd_max:
 				self._process_ack_packet(packet)
 				if packet.ack >= self.snd_fin:
