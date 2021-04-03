@@ -2,7 +2,8 @@ import edtpacket
 import threading
 import time
 
-files = "sadasasdsd"
+PACKET_RETRANSMIT_MAX_COUNT = 3 # If data is not acked, the maxi time to resend
+PACKET_RETRANSMIT_TIMEOUT = 1000 # Time to retransmit a packet if ACK not received
 
 
 class edpsender_socket(self):
@@ -24,15 +25,20 @@ class edpsender_socket(self):
 	#print("transmit finished")
 	#sending window parameters
 	self.snd_ini = 0 #Initial seq number
-	self.snd_nxt = snd_ini #the next seq number to send
+	self.snd_nxt = self.snd_ini #the next seq number to send
 	self.snd_mss = 1024
-	self.snd_max = snd_ini
-	self.snd_wnd = snd_mss #sending window size for control use
-	self.snd_una = snd_ini #seq not yet acknowledged by peer
-	self.tx_buffer_seq_mod = snd_ini #Used to help translate local_seq_send and snd_una numbers to TX buffer pointers
+	self.snd_max = self.snd_ini
+	self.snd_wnd = self.snd_mss #sending window size for control use
+	self.snd_wsc = 1 #sending window scale
+	self.snd_una = self.snd_ini #seq not yet acknowledged by peer
+	self.tx_buffer_seq_mod = self.snd_ini #Used to help translate local_seq_send and snd_una numbers to TX buffer pointers
+    self.snd_ewn = self.snd_mss # Effective window size, used as simple congestion management mechanism
+
+
 
 	self.tx_retransmit_timeout_counter = {}  # Keeps track of the timestamps for the sent out packets, used to determine when to retransmit packet
 	self.rx_retransmit_request_counter = {}  # Keeps track of us sending 'fast retransmit request' packets so we can limit their count to 2
+	self.tx_retransmit_request_counter = {}  # Keeps track of DUP packets sent from peer to determine if any of them is a retransmit request
 
 	self.event_connect = threading.Semaphore(0)  # Used to inform CONNECT syscall that connection related event happened
 	self.event_rx_buffer = threading.Semaphore(0)  # USed to inform RECV syscall that there is new data in buffer ready to be picked up
@@ -88,7 +94,7 @@ class edpsender_socket(self):
 
 	######################### The followings are codes for FSM ############################## 
 
-	def transmit_packet(self,seq=None,packet_type=None,flag_fin=False,controltype={}, data=''):
+	def _transmit_packet(self,seq=None,packet_type=None,flag_fin=False,controltype={}, data=''):
 		#send out data segment from TX buffer using sliding window mechanism
 
 		#global snd_nxt,snd_max,timers,timeout
@@ -129,16 +135,24 @@ class edpsender_socket(self):
 	def transmit_data(self):
 		# add data to the send buffer
 		if self.fsmstate == "CTL_SENT" and self.snd_nxt == self.snd_ini: #check if we need to (re)send inital control packet
-			packet_to_send = transmit_packet(packet_type = 1)
+			packet_to_send = _transmit_packet(packet_type = 1)
 			return
 
 
 		if fsmstate in {"SEMI_CONNECTED"}: #check if we are in the state that allows sending data out
 			remaining_data_len = len(tx.buffer) - tx_buffer_nxt
+			usable_window = self.snd_ewn - self.tx_buffer_nxt
+			transmit_data_len = min(self.snd_mss, usable_window, remaining_data_len)
+			if remaining_data_len:
+				if transmit_data_len:
+					with self.lock_tx_buffer:
+						transmit_data = self.tx_buffer(self.tx_buffer_nxt:self.tx_buffer_nxt + transmit_data_len)
+					self._transmit_packet(packet_type = 3)
+					return
 
 
-		if fsmstate in {"CLOSE_WAIT"}:#check if we need to (re)transmit the final fin packet
-
+		if fsmstate in {"CLOSE_SENT"}:#check if we need to (re)transmit the final fin packet
+			self._transmit_packet(packet_type = 1, flag_fin = True)
 	# def _control_sent_process(self,packet):
 	# 	if self._process_ack_packet()
 	# 		self.event_connect.release()
@@ -147,17 +161,47 @@ class edpsender_socket(self):
 	# 	self._retransmt_packet_timeout()
 
 	def _process_ack_packet(self,packet):
+		# process data/ack packet when the connection is established
+		self.snd_una = max(snd_una,packet.ack) #record the local seq that has been acked by peer
+		if self.snd.nxt < self.snd_una <= self.snd_max:
+			self.snd_nxt = self.snd_una
+
+		#Purge acked data from TX buffer
+		with self.lock_tx_buffer:
+			del self.tx_buffer[: self.tx_buffer_una]
+		self.tx_buffer_seq_mod += self.tx_buffer_una
+		#if packet.packet_type & 0b100: () 
+		#self.rcv_nxt
+		#update remote window size
+		if self.snd_wnd != packet.win * self.snd_wsc:
+			self.sndwnd = packet.win * self.snd_wsc
+
+		#purge expired tx packet retransmit request
+		for seq in list(self.tx_retransmit_request_counter):
+			if seq < packet.ack:
+				self.tx_retransmit_request_counter.pop(seq)
+
+		#purge expired tx packet retransmit timeouts
+		for seq in list(self.tx_retransmit_timeout_counter):
+			if seq < packet.ack:
+				self.tx_retransmit_timeout_counter.pop(seq)
+
 		
-		self.snd_una = max(snd_una,packet.ack)
 
 
 	def _retransmt_packet_timeout(self):
 		#global fsmstate
-		if self.snd_una in self.tx_retransmit_timeout_counter and timers(self.snd_una):
+		if self.snd_una in self.tx_retransmit_timeout_counter and timers(self.snd_una) == 0:
+			#if the unacknowledged packet is timeout
 			if self.tx_retransmit_timeout_counter[self.snd_una] == self.PACKET_RETRANSMIT_MAX_COUNT:
 				#If in any state with established connection connection inform socket about connection failure
 
+			self.snd_ewn = self.snd_mss
+			self.snd_nxt = self.snd_una
 
+			if self.snd_nxt == self.snd_ini or self.snd_nxt == self.snd_fin:
+				self.tx_buffer_seq_mod -= 1
+			return
 
 
 	def edp_fsm(self,packet=None, syscall = None, main_thread = False):
@@ -214,17 +258,51 @@ class edpsender_socket(self):
 		if main_thread:
 			self._retransmt_packet_timeout()
 			self._transmit_data()
-			self._delayed_ack()
+			#self._delayed_ack()
 			if self.closing and not self.tx_buffer: #if finish sending out all data
 				self.fsmstate = "CLOSE_SENT"
         
+
         if packet and packet.packet_type & 0b001: #if got ACK packet
          	if not packet.packet_type & 0b010 and not packet.fin: #if the ack packet is not ctl or fin packet
          		#suspected retransmission request -> reset TX window and local seq number
-         		if packet.seq == self.rcv_nxt
+         		if packet.ack == self.snd_una:
+         			self._retransmit_packet_request(packet)
+         			return
+         		if self.snd_una <= packet.ack <= self.snd_max:
+         			self._process_ack_packet(packet)
+         			return
+
+         if packet and packet.packet_type & 0b100: #if got data packet
+         			#to be finished in the receiver side
+         	return
 
 
-			
+         #Got CLOSE syscall -> Send FIN packet
+         if syscall == "CLOSE":
+         	self.closing = True
+         	return
+
+
+
+         			# self.snd_wnd = packet.win * self.snd_wsc
+         			# self.snd_ewn = self.snd_mss
+         			# self._process_ack_packet(packet)
+
+
+
+
+    def _retransmit_packet_request(self,packet):
+    	#retransmit packet after receiving request from peer
+    	self.tx_retransmit_timeout_counter[packet.ack] = self.tx_retransmit_timeout_counter.get(packet.ack,0)+1
+    	if self.tx_retransmit_request_counter[packet.ack] > 1:
+    		self.snd_nxt = self.snd_una
+
+
+	# def _delayed_ack(self):
+	# #run delayed ack mechanism
+	# 	if timers[1] == 0:
+	# 		if self.rcv_nxt > self.rcv_una		
 
 
 	def run_fsm(self):
@@ -270,5 +348,9 @@ class edpsender_socket(self):
         answer = answer >> 8 | (answer << 8 & 0xff00)
         return answer
 	
+    @property
+    def tx_buffer_una(self):
+        """ 'snd_una' number relative to TX buffer """
 
+        return max(self.snd_una - self.tx_buffer_seq_mod, 0)
 
