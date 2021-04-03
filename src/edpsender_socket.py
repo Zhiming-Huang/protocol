@@ -4,7 +4,7 @@ import time
 
 PACKET_RETRANSMIT_MAX_COUNT = 3 # If data is not acked, the maxi time to resend
 PACKET_RETRANSMIT_TIMEOUT = 1000 # Time to retransmit a packet if ACK not received
-
+TIME_INTERVAL = 0.001
 
 class edpsender_socket(self):
 #s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -108,8 +108,8 @@ class edpsender_socket(self):
 		#global snd_nxt,snd_max,timers,timeout
 		
 		seq = seq if seq else self.snd_nxt
-		flag_ctl = packet_type == 1 or packet_type == 3 or packet_type ==5 or packet_type == 7
-		flag_ack = packet_type == 2 or packet_type == 3 or packet_type ==6 or packet_type == 7
+		flag_ctl = packet_type & 0b010
+		flag_ack = packet_type & 0b001
 		ack = self.rcv_nxt if flag_ack else 0 
 		packet_to_send = edppacket(packet_type = 1,seq)
 		if ack:
@@ -131,8 +131,8 @@ class edpsender_socket(self):
 			self.snd_fin = self.snd_nxt
 
 		# If in (SEMI-)CONNECTION state then reset ACK delay timer
-		if fsmstate == "SEMI_CONNECTED":
-			self.timeout = self.DELAYED_ACK_DELAY
+		# if fsmstate == "SEMI_CONNECTED":
+		# 	self.timeout = self.DELAYED_ACK_DELAY
 
 		# If packet contains data then Initialize / adjust packet's retransmit counter and timer
 		if data or flag_ctl or flag_fin:
@@ -143,7 +143,7 @@ class edpsender_socket(self):
 
 
 
-	def transmit_data(self):
+	def _transmit_data(self):
 		# add data to the send buffer
 		if self.fsmstate == "CTL_SENT" and self.snd_nxt == self.snd_ini: #check if we need to (re)send inital control packet
 			packet_to_send = _transmit_packet(packet_type = 1)
@@ -151,7 +151,7 @@ class edpsender_socket(self):
 
 
 		if fsmstate in {"SEMI_CONNECTED"}: #check if we are in the state that allows sending data out
-			remaining_data_len = len(tx.buffer) - tx_buffer_nxt
+			remaining_data_len = len(self.tx_buffer) - self.tx_buffer_nxt
 			usable_window = self.snd_ewn - self.tx_buffer_nxt
 			transmit_data_len = min(self.snd_mss, usable_window, remaining_data_len)
 			if remaining_data_len:
@@ -202,7 +202,7 @@ class edpsender_socket(self):
 
 	def _retransmt_packet_timeout(self):
 		#global fsmstate
-		if self.snd_una in self.tx_retransmit_timeout_counter and timers(self.snd_una) == 0:
+		if self.snd_una in self.tx_retransmit_timeout_counter and timers(self.snd_una) <= 0:
 			#if the unacknowledged packet is timeout
 			if self.tx_retransmit_timeout_counter[self.snd_una] == self.PACKET_RETRANSMIT_MAX_COUNT:
 				#If in any state with established connection connection inform socket about connection failure
@@ -333,7 +333,7 @@ class edpsender_socket(self):
 
 	def run_fsm(self):
 		while True:
-			time.sleep(0.01)
+			time.sleep(TIME_INTERVAL)
 			for name in self.timers:
 				self.timers[name] -= 1
 			edp_fsm(main_thread=True)
