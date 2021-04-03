@@ -17,7 +17,7 @@ class edpsender_socket(self):
 	self.fsmstate = "CLOSED" #initially the connection is closed, 
 	#"SND_CONNECTED" for single-directed connection from sender to the receiver (i.e., sender can send data to the receiver)
 	self.address = None
-
+	self.connectiontype = {}
 	self.DELAYED_ACK_DELAY = 200
 	self.PACKET_RETRANSMIT_TIMEOUT = 200
 	self.timers = {}
@@ -68,29 +68,37 @@ class edpsender_socket(self):
 		#read from inputs
 		return connectiontype, controltype
 
-
-
 	# def packetgeneration(packettype,controltype,data):
 
 	# 	return bytes
 
 
-	def ConnectionCreate(self,connectiontype, address):
+	def connect(self,connectiontype, address):
 		self.address = address
+		self.connectiontype = connectiontype
 		if connectiontype == 0:
 			return True
 		edp_fsm(syscall="CONNECT")
 		self.event_connect.acquire()
 		return self.fsmstate == "SEMI_CONNECTED" or self.fsmstate == "CONNECTED"
 
-	def Data_transmission(self,controltype, address):
+	def send(self,data):
+		if self.fsmstate in {"SEMI_CONNECTED","CONNECTED"}:
+			with self.lock_tx_buffer:
+				self.tx_buffer.extend(list(data))
+				return len(data)
+		return None
 
-		return True
 
+	def close(self):
+		#close syscall
+		self.tcp_fsm(syscall = "CLOSE")
+		return None
 
-	def connection_close(self,connectiontype, address):
-
-		return True
+	def control_modify(self, connectiontype):
+		if self.fsmstate in {"SEMI_CONNECTED","CONNECTED"}:
+			self.connectiontype = connectiontype
+			self.tcp_fsm(syscall = "CTL_UPDATE")
 
 	######################### The followings are codes for FSM ############################## 
 
@@ -107,10 +115,13 @@ class edpsender_socket(self):
 		if ack:
 			packet_to_send.setack(ack)
 		packet_to_send.set_controltype = controltype
+		if data:
+			checksum = self.checksum(data)
 		#set packets ????
 		packet_to_send.packet2bytes()
 		with lock_socket:
 			s.sendto(packet_to_send.raw,address)
+		
 		self.snd_nxt = seq + len(data) + flag_ctl +flag_fin
 		self.snd_max = max(snd_max,snd_nxt)
 		self.tx_buffer_seq_mod += flag_ctl + flag_fin
@@ -195,6 +206,12 @@ class edpsender_socket(self):
 			#if the unacknowledged packet is timeout
 			if self.tx_retransmit_timeout_counter[self.snd_una] == self.PACKET_RETRANSMIT_MAX_COUNT:
 				#If in any state with established connection connection inform socket about connection failure
+				self._transmit_packet(flag_rst=True,flag_ack = True)
+				if self.fsmstate in {"SEMI_CONNECTED","CLOSE_SENT"}:
+					self.event_rx_buffer.release()
+				if self.fsmstate == "CTL_SENT":
+					SELF.event_connect.release()
+				self.fsmstate = "CLOSED"
 
 			self.snd_ewn = self.snd_mss
 			self.snd_nxt = self.snd_una
@@ -213,6 +230,9 @@ class edpsender_socket(self):
 			"SEMI_CONNECTED": self._edp_fsm_SEMI_CONNECTED,
 			"CLOSE_SENT": self._edp_fsm_CLOSE_SND
 			}[self.fsmstate](packet,syscall,main_thread)
+
+
+
 
 	def _edp_fsm_closed(self,packet,syscall,main_thread):
 		if syscall == "CONNECT":
@@ -244,13 +264,19 @@ class edpsender_socket(self):
 	     
 
 
-	def _edp_fsm_CTL_RCVD(self,packet,syscall,main_thread):
-		self.fsmstate = "SEMI_CONNECTED"
-		
-		if syscall == 0:
-			print(3)
-		else:
-			print(5)
+	def _edp_fsm_CLOSE_SND(self,packet,syscall,main_thread):
+		#If it is in main_thread, transmit FIN packet
+		if main_thread:
+			self._retransmt_packet_timeout()
+			self._transmit_data()
+			return
+
+		if package and packet_type & 0b001: #receive ACK
+			if self.snd_una <=packet.ack<=self.snd_max:
+				self._process_ack_packet(packet)
+				if packet.ack >= self.snd_fin:
+					self.fsmstate = "CLOSED"
+
 
 
 	def  _edp_fsm_SEMI_CONNECTED(self,packet,syscall,main_thread):
@@ -312,12 +338,17 @@ class edpsender_socket(self):
 				self.timers[name] -= 1
 			edp_fsm(main_thread=True)
 
+	
 	###### the followings are some funcitons to assist contol machanisms #############
+	@property
 	def tx_buffer_nxt(self):
 		return max(self.snd_nxt - self.tx_buffer_seq_mod,0)
 
-	def tx_buffer_una(self):
-		return max(self.snd_una - self.tx_buffer_seq_mod,0)
+    @property
+    def tx_buffer_una(self):
+        """ 'snd_una' number relative to TX buffer """
+
+        return max(self.snd_una - self.tx_buffer_seq_mod, 0)
 
 
     def  rx_edp(self):
@@ -348,9 +379,5 @@ class edpsender_socket(self):
         answer = answer >> 8 | (answer << 8 & 0xff00)
         return answer
 	
-    @property
-    def tx_buffer_una(self):
-        """ 'snd_una' number relative to TX buffer """
 
-        return max(self.snd_una - self.tx_buffer_seq_mod, 0)
 
