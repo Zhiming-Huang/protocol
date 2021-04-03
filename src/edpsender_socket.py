@@ -11,7 +11,7 @@ txbuffer = [] # Keeps data sent by application but not acknowledged by peer yet
 rxbuffer = [] # Keeps data received from peer and not received by application yet
 #uakbuffer = [] #keeps track the packet that is not acknowledged
 
-fsmstate = "CLOSED" #initially the connection is closed, 
+fsmstate = "_edp_fsm_CTL_SNDCLOSED" #initially the connection is closed, 
 #"SND_CONNECTED" for single-directed connection from sender to the receiver (i.e., sender can send data to the receiver)
 
 
@@ -67,33 +67,7 @@ def connection_coontrol_set():
 
 
 def ConnectionCreate(connectiontype, address):
-	if connectiontype == 0:
-		return True
-	edp_fsm(syscall="CONNECT")
-	event_connect.acquire()
-	return fsmstate == "SEMI_CONNECTED" or fsmstate == "CONNECTED"
-
-def Data_transmission(controltype, address):
-
-	return True
-
-
-def connection_close(connectiontype, address):
-
-	return True
-
-######################### The followings are codes for FSM ############################## 
-
-def transmit_packet(seq=None,packet_type=None,flag_fin=False,controltype={}, data=''):
-	#send out data segment from TX buffer using sliding window mechanism
-
-	global snd_nxt,snd_max,timers,timeout
-	
-	seq = seq if seq else snd_nxt
-	flag_ctl = packet_type == 1 or packet_type == 3 or packet_type ==5 or packet_type == 7
-	flag_ack = packet_type == 2 or packet_type == 3 or packet_type ==6 or packet_type == 7
-	ack = rcv_nxt if flag_ack else 0 
-	packet_to_send = edppacket(packet_type = 1,seq)
+	if connectiontype == _edp_fsm_CTL_SNDacket(packet_type = 1,seq)
 	if ack:
 		packet_to_send.setack(ack)
 	packet_to_send.set_controltype = controltype
