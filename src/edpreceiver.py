@@ -6,7 +6,7 @@ PACKET_RETRANSMIT_MAX_COUNT = 3 # If data is not acked, the maxi time to resend
 PACKET_RETRANSMIT_TIMEOUT = 1000 # Time to retransmit a packet if ACK not received
 TIME_INTERVAL = 0.001
 
-class edpsender_socket:
+class edpreceiver_socket:
 	def __ini__(self, local_ip_address=None, local_port=None, remote_ip_address=None, remote_port=None, socket=None):
 #s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 	#addresses = (ip,port)
@@ -38,6 +38,15 @@ class edpsender_socket:
 
 
 
+	    #receiving window parameters
+	    self.rcv_ini = 0 #Initial seq number
+	    self.rcv_nxt = 0 #Next seq to be received
+	    self.rcv_una = 0 #seq we acked
+	    self.rcv_mss = config.mtu - 40 #maximum segment size
+	    self.rcv-wnd = 65535 # window size
+	    self.rcv_wsc = 1 # Window scale
+
+
 		self.tx_retransmit_timeout_counter = {}  # Keeps track of the timestamps for the sent out packets, used to determine when to retransmit packet
 		self.rx_retransmit_request_counter = {}  # Keeps track of us sending 'fast retransmit request' packets so we can limit their count to 2
 		self.tx_retransmit_request_counter = {}  # Keeps track of DUP packets sent from peer to determine if any of them is a retransmit request
@@ -59,6 +68,9 @@ class edpsender_socket:
 		# "SEMI_CONNECTED" for a harf connection from the sender to the receiver (i.e., sender can send data to the receiver)
 		# "CONNECTED" for a full connection between the sender and the receiver
 
+
+
+	def 
 
 	def connection_coontrol_set(self):
 		print ("1 for reiable connection and 0 for connectionless")
@@ -102,6 +114,14 @@ class edpsender_socket:
 			self.tcp_fsm(syscall = "CTL_UPDATE")
 
 	######################### The followings are codes for FSM ############################## 
+
+	def edp_fsm_listen(self,packet,syscall,main_thread):
+
+
+
+
+
+
 
 	def _transmit_packet(self,seq=None,packet_type=None,flag_fin=False,controltype={}, data=''):
 		#send out data segment from TX buffer using sliding window mechanism
@@ -227,6 +247,7 @@ class edpsender_socket:
 		with self.lock_fsm:
 			return {
 			"CLOSED": self._edp_fsm_closed,
+			"LISTEN": self._edp_fsm_listen, 
 			"CTL_SENT": self._edp_fsm_CTL_SND,
 			"SEMI_CONNECTED": self._edp_fsm_SEMI_CONNECTED,
 			"CLOSE_SENT": self._edp_fsm_CLOSE_SND
@@ -359,7 +380,6 @@ class edpsender_socket:
     		packet = edppacket(1.0, None)
     		packet.bytes2packet(data_stream)
     		self.edp_fsm(packet=packet)
-
-
+	
 
 
