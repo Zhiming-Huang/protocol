@@ -196,14 +196,14 @@ class edpsocket:
 		ack = self.rcv_nxt if flag_ack else 0
 		packet_to_send = edppacket(version= self.version, packet_type = packet_type)
 		if ack:
-			packet_to_send.set_ack_header(ack=self.rcv_nxt, wnd=self.rcv_wnd, flags=1, mMTU=self.rcv_mss)
+			packet_to_send.set_ack_header(ack=self.rcv_nxt, wnd=self.rcv_wnd - len(rx_buffer), flags=1, mMTU=self.rcv_mss)
 
 		if data:
 			packet_to_send.set_data_header(seq=seq, data_length=len(data), DAT=data):
 
 		packet_to_send.packet2bytes()
 		with lock_socket:
-			s.sendto(packet_to_send.raw,address)
+			self.udpsocket.sendto(packet_to_send.raw,address)
 		self.rcv_una = self.rcv_nxt
 		self.snd_nxt = seq + len(data) + flag_ctl +flag_fin
 		self.snd_max = max(snd_max,snd_nxt)
