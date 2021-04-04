@@ -10,7 +10,7 @@ class edpsender_socket:
 	def __ini__(self, local_ip_address=None, local_port=None, remote_ip_address=None, remote_port=None, socket=None):
 #s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 	#addresses = (ip,port)
-		self.controltype = {'1':1,'2':0}
+		self.controltype = {'1':1,'2':0} # what's the type????
 		self.txbuffer = [] # Keeps data sent by application but not acknowledged by peer yet
 		self.rxbuffer = [] # Keeps data received from peer and not received by application yet
 		#uakbuffer = [] #keeps track the packet that is not acknowledged

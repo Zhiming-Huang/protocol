@@ -229,7 +229,7 @@ class edpreceiver_socket:
 	def _transmit_data(self):
 		# add data to the send buffer
 		if self.fsmstate == "CTL_SENT" and self.snd_nxt == self.snd_ini: #check if we need to (re)send inital control packet
-			packet_to_send = _transmit_packet(packet_type = 1)
+			packet_to_send = _transmit_packet(packet_type = 2)
 			return
 
 
@@ -241,7 +241,7 @@ class edpreceiver_socket:
 				if transmit_data_len:
 					with self.lock_tx_buffer:
 						transmit_data = self.tx_buffer(self.tx_buffer_nxt:self.tx_buffer_nxt + transmit_data_len)
-					self._transmit_packet(packet_type = 3)
+					self._transmit_packet(packet_type = 3,data=transmit_data)
 					return
 
 		if self.state == "CTL_RCVD" and self.snd_nxt == self.snd_ini:
@@ -359,9 +359,9 @@ class edpreceiver_socket:
 	    	self.transmit_data()
 
 	    # If we get an ack packet 
-	    if packet and self.packet_type & 0b001:
+	    if packet and packet.packet_type & 0b001:
 	    	if packet.ack == self.snd_nxt:
-	    		if self.packet_type & 0b010:
+	    		if packet.packet_type & 0b010:
 	    			# if got a ctl from peer, then transit to full_connected
 	    			self.transmit_packet(packet_type=0b001)
 	    			self.fsmstate = "Full_Connected"
