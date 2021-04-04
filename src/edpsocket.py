@@ -146,7 +146,7 @@ class edpsocket:
 
 	def edp_fsm_listen(self,packet,syscall,main_thread):
 		#if got an ctl packet, send ack packet to establish a half connection
-		if packet and packet_type & 0b010:
+		if packet and packet.packet_type & 0b010:
 			self.address = packet.source_address
 			self.snd_mss = min(packet.mss,config.mtu - 40)
 			self.snd_wnd = packet.win * self.snd_wsc
@@ -229,7 +229,7 @@ class edpsocket:
 	def _transmit_data(self):
 		# add data to the send buffer
 		if self.fsmstate == "CTL_SENT" and self.snd_nxt == self.snd_ini: #check if we need to (re)send inital control packet
-			packet_to_send = _transmit_packet(packet_type = 1)
+			packet_to_send = _transmit_packet(packet_type = 0b010)
 			return
 
 
