@@ -10,6 +10,7 @@ class edpsocket:
 	def __ini__(self, local_ip_address=None, local_port=None, remote_ip_address=None, remote_port=None, socket=None):
 #s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 	#addresses = (ip,port)
+		self.version = 1.0 #the version of edp
 		self.controltype = {'1':1,'2':0}
 		self.txbuffer = [] # Keeps data sent by application but not acknowledged by peer yet
 		self.rxbuffer = [] # Keeps data received from peer and not received by application yet
@@ -46,7 +47,7 @@ class edpsocket:
 	    self.rcv_nxt = 0 #Next seq to be received
 	    self.rcv_una = 0 #seq we acked
 	    self.rcv_mss = config.mtu - 40 #maximum segment size
-	    self.rcv-wnd = 65535 # window size
+	    self.rcv_wnd = 65535 # window size
 	    self.rcv_wsc = 1 # Window scale
 
 
@@ -192,17 +193,17 @@ class edpsocket:
 		seq = seq if seq else self.snd_nxt
 		flag_ctl = packet_type & 0b010
 		flag_ack = packet_type & 0b001
-		ack = self.rcv_nxt if flag_ack else 0 
-		packet_to_send = edppacket(packet_type = 1,seq)
+		ack = self.rcv_nxt if flag_ack else 0
+		packet_to_send = edppacket(version= self.version, packet_type = packet_type)
 		if ack:
-			packet_to_send.setack(ack)
-		packet_to_send.set_controltype = controltype
+			packet_to_send.set_ack_header(ack=self.rcv_nxt, wnd=self.rcv_wnd - len(rx_buffer), flags=1, mMTU=self.rcv_mss)
+
 		if data:
-			checksum = self.checksum(data)
-		#set packets ????
+			packet_to_send.set_data_header(seq=seq, data_length=len(data), DAT=data):
+
 		packet_to_send.packet2bytes()
 		with lock_socket:
-			s.sendto(packet_to_send.raw,address)
+			self.udpsocket.sendto(packet_to_send.raw,self.address)
 		self.rcv_una = self.rcv_nxt
 		self.snd_nxt = seq + len(data) + flag_ctl +flag_fin
 		self.snd_max = max(snd_max,snd_nxt)
@@ -317,7 +318,7 @@ class edpsocket:
 
 	def _retransmt_packet_timeout(self):
 		#global fsmstate
-		if self.snd_una in self.tx_retransmit_timeout_counter and timers(self.snd_una) <= 0:
+		if self.snd_una in self.tx_retransmit_timeout_counter and self.timers[self.snd_una] <= 0:
 			#if the unacknowledged packet is timeout
 			if self.tx_retransmit_timeout_counter[self.snd_una] == self.PACKET_RETRANSMIT_MAX_COUNT:
 				#If in any state with established connection connection inform socket about connection failure
