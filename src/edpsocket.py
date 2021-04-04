@@ -126,13 +126,13 @@ class edpsocket:
 
 	def close(self):
 		#close syscall
-		self.tcp_fsm(syscall = "CLOSE")
+		self.edp_fsm(syscall = "CLOSE")
 		return None
 
 	def control_modify(self, connectiontype):
 		if self.fsmstate in {"SEMI_CONNECTED","CONNECTED"}:
 			self.connectiontype = connectiontype
-			self.tcp_fsm(syscall = "CTL_UPDATE")
+			self.edp_fsm(syscall = "CTL_UPDATE")
 
 	######################### The followings are codes for FSM ############################## 
     def _enqueue_rx_buffer(self,data):
