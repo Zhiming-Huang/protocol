@@ -193,12 +193,11 @@ class edpsocket:
 		flag_ctl = packet_type & 0b010
 		flag_ack = packet_type & 0b001
 		ack = self.rcv_nxt if flag_ack else 0 
-		packet_to_send = edppacket(packet_type = 1,seq)
 		if ack:
-			packet_to_send.setack(ack)
+			packet_to_send = edppacket(packet_type = 0b001,seq)
+			packet_to_send.ack =ack
 		packet_to_send.set_controltype = controltype
-		if data:
-			checksum = self.checksum(data)
+
 		#set packets ????
 		packet_to_send.packet2bytes()
 		with lock_socket:
