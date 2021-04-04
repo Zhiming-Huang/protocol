@@ -24,6 +24,7 @@ class edpreceiver_socket:
 		self.connectiontype = {}
 		self.DELAYED_ACK_DELAY = 200
 		self.PACKET_RETRANSMIT_TIMEOUT = 200
+		self.FINWAIT = 200
 		self.timers = {}
 		self.delayed_ack_timer = self.DELAYED_ACK_DELAY
 		#print("transmit finished")
@@ -77,13 +78,8 @@ class edpreceiver_socket:
 		self.event_connect.acquire()
 		return self.fsmstate == "SEMI_CONNECTED" 
 
-	def connection_coontrol_set(self):
-		print ("1 for reiable connection and 0 for connectionless")
-		ans = input()
-		if ans == 1:
-			connectiontype = 1
-		print ("1 for ")
-		print ("1 for reiability control")
+	def connection_coontrol_set(self,controltype):
+		self.controltype = controltype
 		#read from inputs
 		return connectiontype, controltype
 
@@ -177,6 +173,15 @@ class edpreceiver_socket:
 				self.event_connect.release()
 
 
+	def _edp_fsm_CLOSE_RCV(self,packet,syscall,main_thread):
+		if packet and packet.fin:
+			self._transmit_packet(flag_ack = True)
+		if main_thread:
+			self.FINWAIT -= 1
+			if self.FINWAIT <= 0:
+				self.fsmstate = "CLOSED"
+				self.FINWAIT = 200
+
 
 
 	def _transmit_packet(self,seq=None,packet_type=None,flag_fin=False,controltype={}, data=''):
@@ -208,7 +213,8 @@ class edpreceiver_socket:
 			self.snd_fin = self.snd_nxt
 
 		# If in (SEMI-)CONNECTION state then reset ACK delay timer
-		# if fsmstate == "SEMI_CONNECTED":
+		if fsmstate == "SEMI_CONNECTED":
+			self.delayed_ack_timer = self.DELAYED_ACK_DELAY
 		# 	self.timeout = self.DELAYED_ACK_DELAY
 
 		# If packet contains data then Initialize / adjust packet's retransmit counter and timer
@@ -379,7 +385,7 @@ class edpreceiver_socket:
 		if main_thread:
 			self._retransmt_packet_timeout()
 			self._transmit_data()
-			#self._delayed_ack()
+			self._delayed_ack()
 			if self.closing and not self.tx_buffer: #if finish sending out all data
 				self.fsmstate = "CLOSE_SENT"
         
@@ -393,11 +399,10 @@ class edpreceiver_socket:
          		if self.snd_una <= packet.ack <= self.snd_max:
          			self._process_ack_packet(packet)
          			return
-         		if packet.fin:
-         			self.fsmstate = "CLOSE_RCV"
 
 
-         if packet and packet.packet_type & 0b100: #if got data packet
+
+        if packet and packet.packet_type & 0b100: #if got data packet
          			#to be finished in the receiver side
          	if packet.seq > self.rcv_nxt: #got a higher seq than we expected
          		self.ooo_packet_queue[paket.seq] = packet
@@ -407,15 +412,19 @@ class edpreceiver_socket:
          		return
 
 
-         	if packet.seq == self.rcv_nxt:
+         	if packet.seq == self.rcv_nxt: #regular packets
          		self._process_ack_packet(packet)
          		return
          	return
 
+        if packet and packet.fin: #receive a packet with the fin field set
+         	self.fsmstate = "CLOSE_RCV"
+         	self._process_ack_packet(packet)
+         	self.transmit_packet(flag_ack = True)
 
 
          #Got CLOSE syscall -> Send FIN packet
-         if syscall == "CLOSE":
+        if syscall == "CLOSE":
          	self.closing = True
          	return
 
