@@ -203,7 +203,7 @@ class edpsocket:
 
 		packet_to_send.packet2bytes()
 		with lock_socket:
-			self.udpsocket.sendto(packet_to_send.raw,address)
+			self.udpsocket.sendto(packet_to_send.raw,self.address)
 		self.rcv_una = self.rcv_nxt
 		self.snd_nxt = seq + len(data) + flag_ctl +flag_fin
 		self.snd_max = max(snd_max,snd_nxt)
