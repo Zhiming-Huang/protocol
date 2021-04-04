@@ -309,7 +309,7 @@ class edpsocket:
 
 	def _retransmt_packet_timeout(self):
 		#global fsmstate
-		if self.snd_una in self.tx_retransmit_timeout_counter and timers(self.snd_una) <= 0:
+		if self.snd_una in self.tx_retransmit_timeout_counter and self.timers[self.snd_una] <= 0:
 			#if the unacknowledged packet is timeout
 			if self.tx_retransmit_timeout_counter[self.snd_una] == self.PACKET_RETRANSMIT_MAX_COUNT:
 				#If in any state with established connection connection inform socket about connection failure
