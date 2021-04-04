@@ -18,6 +18,8 @@ class edpreceiver_socket:
 		self.fsmstate = "CLOSED" #initially the connection is closed, 
 		#"SND_CONNECTED" for single-directed connection from sender to the receiver (i.e., sender can send data to the receiver)
 		self.address = None
+		#self.remote_address = None
+		self.udpsocket.bind((local_ip_address,local_port))
 
 		self.connectiontype = {}
 		self.DELAYED_ACK_DELAY = 200
@@ -61,7 +63,7 @@ class edpreceiver_socket:
 
 		self.closing = False  # Indicates that CLOSE syscall is in progress, this lets to finish sending data before FIN packet is transmitted
 		self.ooo_packet_queue = {}  # Out of order packet buffer
-		threading.Thread(target=run_fsm).start()
+		threading.Thread(target=run_fsm).start() #start the finite state machine for edp
 		threading.Thread(target=rx_edp).start() #keep receiving packets
 
 		self.fsmstate = "CLOSED" #initially the connection is closed, 
@@ -70,7 +72,10 @@ class edpreceiver_socket:
 
 
 
-	def 
+	def listen(self):
+		self.tcp_fsm(syscall = "LISTEN")
+		self.event_connect.acquire()
+		return self.fsmstate == "SEMI_CONNECTED" 
 
 	def connection_coontrol_set(self):
 		print ("1 for reiable connection and 0 for connectionless")
@@ -103,6 +108,26 @@ class edpreceiver_socket:
 		return None
 
 
+	def receive(self,byte_count = None):
+		self.event_rx_buffer.acquire() # wait till there is any data in the buffer
+
+		if not self.rx_buffer and self.state == "CLOSED":
+			return None
+		with self.lock_rx_buffer:
+			if byte_count is None:
+				byte_count = len(self.rx_buffer)
+			else:
+				byte_count = min(byte_count,len(self.rx_buffer))
+
+			rx_buffer = self.rx_buffer[:byte_count]
+			del self.rx_buffer[:byte_count]
+
+			#if there is any data left or closed connection then release the rx_buffer event
+			if self.rx_buffer:
+				self.event_rx_buffer.release()
+		return bytes(rx_buffer)
+
+
 	def close(self):
 		#close syscall
 		self.tcp_fsm(syscall = "CLOSE")
@@ -114,11 +139,42 @@ class edpreceiver_socket:
 			self.tcp_fsm(syscall = "CTL_UPDATE")
 
 	######################### The followings are codes for FSM ############################## 
+    def _enqueue_rx_buffer(self,data):
+    	with self.lock_rx_buffer:
+    		self.lock_rx_buffer.extend(list(data))
+    		#if rx_buffer event has not been released yet (it could be released if some data were sitting in buffer already) then release it
+    		if not self.event_rx_buffer._value:
+    			self.event_rx_buffer.release()
+
+
 
 	def edp_fsm_listen(self,packet,syscall,main_thread):
+		#if got an ctl packet, send ack packet to establish a half connection
+		if packet and packet_type & 0b010:
+			self.address = packet.source_address
+			self.snd_mss = min(packet.mss,config.mtu - 40)
+			self.snd_wnd = packet.win * self.snd_wsc
+			self.snd_wsc = pcket.wscale if None else 1 # if peer does not support window scaling, then set it to 1
+			self.snd_ewn = self.snd_mss
+			self.rcv_nxt = 1
+			self.fsmstate = "CTL_RCVD"
+			self._transmit_packet(flag_ack=True)
+			return
+		if syscall = "CLOSE":
+			self.fsmstate = "CLOSED"
+			return 
+
+	def _edp_fsm_CTL_RCV(self,packet,syscall,main_thread):
+		# for main_thread, resend ACK if its timer expired
+		if packet and packet.packet_type & 0b010: #if receive ctl again, which means the former ack is not received
+			self._transmit_packet(flag_ack=True)
 
 
-
+		if packet and packet.packet_type & 0b100: #if received a data packet
+			if packet.seq == self.rcv_nxt:
+				self.fsmstate = "SEMI_CONNECTED"
+				self._process_ack_packet(packet)
+				self.event_connect.release()
 
 
 
@@ -142,7 +198,7 @@ class edpreceiver_socket:
 		packet_to_send.packet2bytes()
 		with lock_socket:
 			s.sendto(packet_to_send.raw,address)
-		
+		self.rcv_una = self.rcv_nxt
 		self.snd_nxt = seq + len(data) + flag_ctl +flag_fin
 		self.snd_max = max(snd_max,snd_nxt)
 		self.tx_buffer_seq_mod += flag_ctl + flag_fin
@@ -182,6 +238,9 @@ class edpreceiver_socket:
 					self._transmit_packet(packet_type = 3)
 					return
 
+		if self.state == "CTL_RCVD" and self.snd_nxt == self.snd_ini:
+			self._transmit_packet(flag_ack = True)
+
 
 		if fsmstate in {"CLOSE_SENT"}:#check if we need to (re)transmit the final fin packet
 			self._transmit_packet(packet_type = 1, flag_fin = True)
@@ -194,30 +253,45 @@ class edpreceiver_socket:
 
 	def _process_ack_packet(self,packet):
 		# process data/ack packet when the connection is established
-		self.snd_una = max(snd_una,packet.ack) #record the local seq that has been acked by peer
-		if self.snd.nxt < self.snd_una <= self.snd_max:
-			self.snd_nxt = self.snd_una
+		if packet.packet_type & 0b001:
+			self.snd_una = max(snd_una,packet.ack) #record the local seq that has been acked by peer
+			if self.snd.nxt < self.snd_una <= self.snd_max:
+				self.snd_nxt = self.snd_una
 
-		#Purge acked data from TX buffer
-		with self.lock_tx_buffer:
-			del self.tx_buffer[: self.tx_buffer_una]
-		self.tx_buffer_seq_mod += self.tx_buffer_una
-		#if packet.packet_type & 0b100: () 
-		#self.rcv_nxt
-		#update remote window size
-		if self.snd_wnd != packet.win * self.snd_wsc:
-			self.sndwnd = packet.win * self.snd_wsc
+			#Purge acked data from TX buffer
+			with self.lock_tx_buffer:
+				del self.tx_buffer[: self.tx_buffer_una]
+			self.tx_buffer_seq_mod += self.tx_buffer_una
+			#if packet.packet_type & 0b100: () 
+			#self.rcv_nxt
+			#update remote window size
+			if self.snd_wnd != packet.win * self.snd_wsc:
+				self.sndwnd = packet.win * self.snd_wsc
 
-		#purge expired tx packet retransmit request
-		for seq in list(self.tx_retransmit_request_counter):
-			if seq < packet.ack:
-				self.tx_retransmit_request_counter.pop(seq)
+			self.snd_ewn = min(self.snd_ewn << 1, self.snd_wnd)
 
-		#purge expired tx packet retransmit timeouts
-		for seq in list(self.tx_retransmit_timeout_counter):
-			if seq < packet.ack:
-				self.tx_retransmit_timeout_counter.pop(seq)
+			#purge expired tx packet retransmit request
+			for seq in list(self.tx_retransmit_request_counter):
+				if seq < packet.ack:
+					self.tx_retransmit_request_counter.pop(seq)
 
+			#purge expired tx packet retransmit timeouts
+			for seq in list(self.tx_retransmit_timeout_counter):
+				if seq < packet.ack:
+					self.tx_retransmit_timeout_counter.pop(seq)
+
+		if packet.packet_type & 0b100: #if packet is a data packet
+			self.rcv_nxt = packet.seq + len(packet.data)
+			self._enqueue_rx_buffer(packet.data)
+
+			#purge expired rx retransmit requests
+			for seq in list(self.rx_retransmit_request_counter):
+				if seq < self.rcv_nxt:
+					self.rx_retransmit_request_counter.pop(seq)
+
+			#Bring next packet from ooo_paket_queue if available
+			if packet := self.ooo_packet_queue.pop(self.rcv_nxt,None):
+				self.edp_fsm(packet)
 		
 
 
@@ -247,10 +321,12 @@ class edpreceiver_socket:
 		with self.lock_fsm:
 			return {
 			"CLOSED": self._edp_fsm_closed,
-			"LISTEN": self._edp_fsm_listen, 
+			"LISTEN": self._edp_fsm_listen,
+			"CTL_RCVD": self._edp_fsm_CTL_RCV,
 			"CTL_SENT": self._edp_fsm_CTL_SND,
 			"SEMI_CONNECTED": self._edp_fsm_SEMI_CONNECTED,
-			"CLOSE_SENT": self._edp_fsm_CLOSE_SND
+			"CLOSE_SENT": self._edp_fsm_CLOSE_SND,
+			"CLOSE_RCV": self._edp_fsm_CLOSE_RCV
 			}[self.fsmstate](packet,syscall,main_thread)
 
 
@@ -259,6 +335,9 @@ class edpreceiver_socket:
 	def _edp_fsm_closed(self,packet,syscall,main_thread):
 		if syscall == "CONNECT":
 			self.fsmstate = "CTL_SENT"
+
+		if syscall == "LISTEN":
+			self.fsmstate = "LISTEN"
 
 
 
@@ -286,18 +365,6 @@ class edpreceiver_socket:
 	     
 
 
-	def _edp_fsm_CLOSE_SND(self,packet,syscall,main_thread):
-		#If it is in main_thread, transmit FIN packet
-		if main_thread:
-			self._retransmt_packet_timeout()
-			self._transmit_data()
-			return
-
-		if packet and packet_type & 0b001: #receive ACK
-			if self.snd_una <=packet.ack<=self.snd_max:
-				self._process_ack_packet(packet)
-				if packet.ack >= self.snd_fin:
-					self.fsmstate = "CLOSED"
 
 
 
@@ -314,16 +381,31 @@ class edpreceiver_socket:
         if packet and packet.packet_type & 0b001: #if got ACK packet
          	if not packet.packet_type & 0b010 and not packet.fin: #if the ack packet is not ctl or fin packet
          		#suspected retransmission request -> reset TX window and local seq number
-         		if packet.ack == self.snd_una:
+         		if packet.ack == self.snd_una and not packet.packet_type & 0b100:
          			self._retransmit_packet_request(packet)
          			return
          		if self.snd_una <= packet.ack <= self.snd_max:
          			self._process_ack_packet(packet)
          			return
+         		if packet.fin:
+         			self.fsmstate = "CLOSE_RCV"
+
 
          if packet and packet.packet_type & 0b100: #if got data packet
          			#to be finished in the receiver side
+         	if packet.seq > self.rcv_nxt: #got a higher seq than we expected
+         		self.ooo_packet_queue[paket.seq] = packet
+         		self.rx_retransmit_request_counter[self.rcv_nxt] = self.rx_retransmit_request_counter.get(self.rcv_nxt,0) + 1
+         		if self.rx_retransmit_request_counter[self.rcv_nxt] <= 2:
+         			self._transmit_packet(flag_ack = True)
+         		return
+
+
+         	if packet.seq == self.rcv_nxt:
+         		self._process_ack_packet(packet)
+         		return
          	return
+
 
 
          #Got CLOSE syscall -> Send FIN packet
@@ -337,6 +419,18 @@ class edpreceiver_socket:
          			# self.snd_ewn = self.snd_mss
          			# self._process_ack_packet(packet)
 
+	def _edp_fsm_CLOSE_SND(self,packet,syscall,main_thread):
+		#If it is in main_thread, transmit FIN packet
+		if main_thread:
+			self._retransmt_packet_timeout()
+			self._transmit_data()
+			return
+
+		if packet and packet_type & 0b001: #receive ACK
+			if self.snd_una <=packet.ack<=self.snd_max:
+				self._process_ack_packet(packet)
+				if packet.ack >= self.snd_fin:
+					self.fsmstate = "CLOSED"
 
 
 
@@ -379,6 +473,7 @@ class edpreceiver_socket:
     		data_stream,address:=self.udpsocket.recvfrom(2048)
     		packet = edppacket(1.0, None)
     		packet.bytes2packet(data_stream)
+    		packet.source_address = address
     		self.edp_fsm(packet=packet)
 	
 
