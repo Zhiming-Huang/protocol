@@ -6,7 +6,7 @@ PACKET_RETRANSMIT_MAX_COUNT = 3 # If data is not acked, the maxi time to resend
 PACKET_RETRANSMIT_TIMEOUT = 1000 # Time to retransmit a packet if ACK not received
 TIME_INTERVAL = 0.001
 
-class edpreceiver_socket:
+class edpsocket:
 	def __ini__(self, local_ip_address=None, local_port=None, remote_ip_address=None, remote_port=None, socket=None):
 #s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 	#addresses = (ip,port)
@@ -17,8 +17,8 @@ class edpreceiver_socket:
 		self.udpsocket = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
 		self.fsmstate = "CLOSED" #initially the connection is closed, 
 		#"SND_CONNECTED" for single-directed connection from sender to the receiver (i.e., sender can send data to the receiver)
-		self.address = None
-		#self.remote_address = None
+		self.address = None #remote address
+
 		self.udpsocket.bind((local_ip_address,local_port))
 
 		self.connectiontype = {}
@@ -74,7 +74,7 @@ class edpreceiver_socket:
 
 
 	def listen(self):
-		self.tcp_fsm(syscall = "LISTEN")
+		self.edp_fsm(syscall = "LISTEN")
 		self.event_connect.acquire()
 		return self.fsmstate == "SEMI_CONNECTED" 
 
@@ -92,7 +92,7 @@ class edpreceiver_socket:
 		self.connectiontype = connectiontype
 		if connectiontype == 0:
 			return True
-		edp_fsm(syscall="CONNECT")
+		self.edp_fsm(syscall="CONNECT")
 		self.event_connect.acquire()
 		return self.fsmstate == "SEMI_CONNECTED" or self.fsmstate == "CONNECTED"
 
@@ -126,13 +126,13 @@ class edpreceiver_socket:
 
 	def close(self):
 		#close syscall
-		self.tcp_fsm(syscall = "CLOSE")
+		self.edp_fsm(syscall = "CLOSE")
 		return None
 
 	def control_modify(self, connectiontype):
 		if self.fsmstate in {"SEMI_CONNECTED","CONNECTED"}:
 			self.connectiontype = connectiontype
-			self.tcp_fsm(syscall = "CTL_UPDATE")
+			self.edp_fsm(syscall = "CTL_UPDATE")
 
 	######################### The followings are codes for FSM ############################## 
     def _enqueue_rx_buffer(self,data):
@@ -146,7 +146,7 @@ class edpreceiver_socket:
 
 	def edp_fsm_listen(self,packet,syscall,main_thread):
 		#if got an ctl packet, send ack packet to establish a half connection
-		if packet and packet_type & 0b010:
+		if packet and packet.packet_type & 0b010:
 			self.address = packet.source_address
 			self.snd_mss = min(packet.mss,config.mtu - 40)
 			self.snd_wnd = packet.win * self.snd_wsc
@@ -229,7 +229,11 @@ class edpreceiver_socket:
 	def _transmit_data(self):
 		# add data to the send buffer
 		if self.fsmstate == "CTL_SENT" and self.snd_nxt == self.snd_ini: #check if we need to (re)send inital control packet
+<<<<<<< HEAD:src/edpreceiver.py
 			packet_to_send = _transmit_packet(packet_type = 2)
+=======
+			packet_to_send = _transmit_packet(packet_type = 0b010)
+>>>>>>> fa96a348b914b062ce7e74bd8a2a260f11feb844:src/edpsocket.py
 			return
 
 
@@ -241,15 +245,19 @@ class edpreceiver_socket:
 				if transmit_data_len:
 					with self.lock_tx_buffer:
 						transmit_data = self.tx_buffer(self.tx_buffer_nxt:self.tx_buffer_nxt + transmit_data_len)
+<<<<<<< HEAD:src/edpreceiver.py
 					self._transmit_packet(packet_type = 3,data=transmit_data)
+=======
+					self._transmit_packet(packet_type = 0b100)
+>>>>>>> fa96a348b914b062ce7e74bd8a2a260f11feb844:src/edpsocket.py
 					return
 
 		if self.state == "CTL_RCVD" and self.snd_nxt == self.snd_ini:
-			self._transmit_packet(flag_ack = True)
+			self._transmit_packet(packet_type = 0b001)
 
 
-		if fsmstate in {"CLOSE_SENT"}:#check if we need to (re)transmit the final fin packet
-			self._transmit_packet(packet_type = 1, flag_fin = True)
+		if self.fsmstate in {"CLOSE_SENT"}:#check if we need to (re)transmit the final fin packet
+			self._transmit_packet(packet_type = 0b001, flag_fin = True)
 	# def _control_sent_process(self,packet):
 	# 	if self._process_ack_packet()
 	# 		self.event_connect.release()
@@ -272,7 +280,7 @@ class edpreceiver_socket:
 			#self.rcv_nxt
 			#update remote window size
 			if self.snd_wnd != packet.win * self.snd_wsc:
-				self.sndwnd = packet.win * self.snd_wsc
+				self.snd_wnd = packet.win * self.snd_wsc
 
 			self.snd_ewn = min(self.snd_ewn << 1, self.snd_wnd)
 
@@ -357,6 +365,7 @@ class edpreceiver_socket:
 		if main_thread == True:
 			self._retransmt_packet_timeout()
 	    	self.transmit_data()
+	    	return
 
 	    # If we get an ack packet 
 	    if packet and packet.packet_type & 0b001:
@@ -465,7 +474,7 @@ class edpreceiver_socket:
 	def run_fsm(self):
 		while True:
 			time.sleep(TIME_INTERVAL)
-			self.delayed_ack_timer -=1
+			self.delayed_ack_timer -= 1
 			for name in self.timers:
 				self.timers[name] -= 1
 			edp_fsm(main_thread=True)

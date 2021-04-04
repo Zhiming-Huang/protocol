@@ -6,6 +6,7 @@ import struct
 
 class edppacket(object):
     def __init__(self, version, packet_type):
+          self.source_address = None
           # common header
           #  |Version|packet_type|length_common|checksum|
           #  |   B   |     B     |       B     |   H    |
@@ -22,8 +23,9 @@ class edppacket(object):
           # ACK header
           #  |ack|wnd|flags|mMTU|
           #  | L | H |  B  |  H |
-          self.ack = 0
-          self.wnd = 0
+          # flags | 0 | 0 | 0 |URG|PSH|RST|SYN|FIN| 0b000xxxxx
+          self.ack = 0  # ACK sequence
+          self.wnd = 0  # window sizes
           self.flags = 0
           self.mMTU = 0
 
