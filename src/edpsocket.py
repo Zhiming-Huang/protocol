@@ -248,7 +248,7 @@ class edpsocket:
 			self._transmit_packet(packet_type = 0b001)
 
 
-		if fsmstate in {"CLOSE_SENT"}:#check if we need to (re)transmit the final fin packet
+		if self.fsmstate in {"CLOSE_SENT"}:#check if we need to (re)transmit the final fin packet
 			self._transmit_packet(packet_type = 0b001, flag_fin = True)
 	# def _control_sent_process(self,packet):
 	# 	if self._process_ack_packet()
