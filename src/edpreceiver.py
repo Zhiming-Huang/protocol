@@ -25,7 +25,7 @@ class edpreceiver_socket:
 		self.DELAYED_ACK_DELAY = 200
 		self.PACKET_RETRANSMIT_TIMEOUT = 200
 		self.timers = {}
-
+		self.delayed_ack_timer = self.DELAYED_ACK_DELAY
 		#print("transmit finished")
 		#sending window parameters
 		self.snd_ini = 0 #Initial seq number
@@ -293,7 +293,13 @@ class edpreceiver_socket:
 			if packet := self.ooo_packet_queue.pop(self.rcv_nxt,None):
 				self.edp_fsm(packet)
 		
+    def _delayed_ack(self):
+        """ Run Delayed ACK mechanism """
 
+        if self.delayed_ack_timer <= 0:
+            if self.rcv_nxt > self.rcv_una:
+                self._transmit_packet(flag_ack=True)
+            self.delayed_ack_timer = self.DELAYED_ACK_DELAY
 
 	def _retransmt_packet_timeout(self):
 		#global fsmstate
@@ -450,6 +456,7 @@ class edpreceiver_socket:
 	def run_fsm(self):
 		while True:
 			time.sleep(TIME_INTERVAL)
+			self.delayed_ack_timer -=1
 			for name in self.timers:
 				self.timers[name] -= 1
 			edp_fsm(main_thread=True)
