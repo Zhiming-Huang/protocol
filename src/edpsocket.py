@@ -17,8 +17,8 @@ class edpsocket:
 		self.udpsocket = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
 		self.fsmstate = "CLOSED" #initially the connection is closed, 
 		#"SND_CONNECTED" for single-directed connection from sender to the receiver (i.e., sender can send data to the receiver)
-		self.address = None
-		#self.remote_address = None
+		self.address = None #remote address
+
 		self.udpsocket.bind((local_ip_address,local_port))
 
 		self.connectiontype = {}
@@ -74,7 +74,7 @@ class edpsocket:
 
 
 	def listen(self):
-		self.tcp_fsm(syscall = "LISTEN")
+		self.edp_fsm(syscall = "LISTEN")
 		self.event_connect.acquire()
 		return self.fsmstate == "SEMI_CONNECTED" 
 
@@ -92,7 +92,7 @@ class edpsocket:
 		self.connectiontype = connectiontype
 		if connectiontype == 0:
 			return True
-		edp_fsm(syscall="CONNECT")
+		self.edp_fsm(syscall="CONNECT")
 		self.event_connect.acquire()
 		return self.fsmstate == "SEMI_CONNECTED" or self.fsmstate == "CONNECTED"
 
@@ -272,7 +272,7 @@ class edpsocket:
 			#self.rcv_nxt
 			#update remote window size
 			if self.snd_wnd != packet.win * self.snd_wsc:
-				self.sndwnd = packet.win * self.snd_wsc
+				self.snd_wnd = packet.win * self.snd_wsc
 
 			self.snd_ewn = min(self.snd_ewn << 1, self.snd_wnd)
 
@@ -357,6 +357,7 @@ class edpsocket:
 		if main_thread == True:
 			self._retransmt_packet_timeout()
 	    	self.transmit_data()
+	    	return
 
 	    # If we get an ack packet 
 	    if packet and self.packet_type & 0b001:
@@ -465,7 +466,7 @@ class edpsocket:
 	def run_fsm(self):
 		while True:
 			time.sleep(TIME_INTERVAL)
-			self.delayed_ack_timer -=1
+			self.delayed_ack_timer -= 1
 			for name in self.timers:
 				self.timers[name] -= 1
 			edp_fsm(main_thread=True)
