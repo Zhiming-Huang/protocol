@@ -241,15 +241,15 @@ class edpsocket:
 				if transmit_data_len:
 					with self.lock_tx_buffer:
 						transmit_data = self.tx_buffer(self.tx_buffer_nxt:self.tx_buffer_nxt + transmit_data_len)
-					self._transmit_packet(packet_type = 3)
+					self._transmit_packet(packet_type = 0b100)
 					return
 
 		if self.state == "CTL_RCVD" and self.snd_nxt == self.snd_ini:
-			self._transmit_packet(flag_ack = True)
+			self._transmit_packet(packet_type = 0b001)
 
 
 		if fsmstate in {"CLOSE_SENT"}:#check if we need to (re)transmit the final fin packet
-			self._transmit_packet(packet_type = 1, flag_fin = True)
+			self._transmit_packet(packet_type = 0b001, flag_fin = True)
 	# def _control_sent_process(self,packet):
 	# 	if self._process_ack_packet()
 	# 		self.event_connect.release()
