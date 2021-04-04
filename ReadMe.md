@@ -33,9 +33,9 @@ different control segment. The benefits of this design are threefold:
     of packet with different size of header. In this way the overall
     overhead can be reduced.
 
-![Architecture of EXTP protocol \label{fig:EXTP}](Figure/EXTP.png "fig:") 
+![Architecture of EXTP protocol](Figure/EXTP.png) {#fig:EXTP}
 
-The architecture of EXTP is shown in Fig. \ref{fig:EXTP}. EXTP establishes a
+The architecture of EXTP is shown in Fig. @fig:EXTP. EXTP establishes a
 session module for each conversation between two applications. The
 connection type is decided upon the service requirements. Two types of
 connection is defined: The first type at the left-hand side of
