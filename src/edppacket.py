@@ -43,7 +43,6 @@ class edppacket(object):
           # self.Length = 0
           self.raw = b''
 
-
     def printrow(self):
       print(self.raw)
     # # Set header
