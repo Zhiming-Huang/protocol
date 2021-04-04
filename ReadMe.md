@@ -33,18 +33,18 @@ different control segment. The benefits of this design are threefold:
     of packet with different size of header. In this way the overall
     overhead can be reduced.
 
-![Architecture of EXTP protocol](Figure/EXTP.png "fig:") [fig:EXTP]
+![Architecture of EXTP protocol \label{fig:EXTP}](Figure/EXTP.png "fig:") 
 
-The architecture of EXTP is shown in Fig. [fig:EXTP]. EXTP establishes a
+The architecture of EXTP is shown in Fig. \ref{fig:EXTP}. EXTP establishes a
 session module for each conversation between two applications. The
 connection type is decided upon the service requirements. Two types of
 connection is defined: The first type at the left-hand side of
-Fig. [fig:EXTP] is the fully connection type where two ends can
+Fig. \ref{fig:EXTP} is the fully connection type where two ends can
 send/receive data at the same time. The connection is managed by the
 **connection management (CM)** module. Currently, we use the classic
 three-way handshake for connection establishment and four-way handshake
 to release connection. The second type at the right-hand side of
-Fig. [fig:EXTP] is the semi-connected type connection where
+Fig. \ref{fig:EXTP} is the semi-connected type connection where
 half-connection service is provided.
 
 Then the **Packet type selection** module is activated upon the
@@ -53,8 +53,7 @@ header into two parts: common header and specific header. The common
 header is used in every packet containing necessary information such as
 protocol version, packet type, etc.. The specific header is further
 classified into three subclasses, namely control header, data header,
-and ACK header. Fig. [fig:Struct] shows our design for each packet
-header. Packet type selection module generates the corresponding packet
+and ACK header. Packet type selection module generates the corresponding packet
 headers for each packet. For example, the acknowledgement packet will
 only combine the common header and the ACK header. In this way, the
 overall overhead can be reduced comparing with TCP.
