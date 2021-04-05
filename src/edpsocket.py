@@ -5,7 +5,7 @@ import socket
 
 PACKET_RETRANSMIT_MAX_COUNT = 3 # If data is not acked, the maxi time to resend
 PACKET_RETRANSMIT_TIMEOUT = 1000 # Time to retransmit a packet if ACK not received
-TIME_INTERVAL = 5
+TIME_INTERVAL = 1
 
 class edpsocket:
 	def __init__(self, local_ip_address=None, local_port=None, remote_ip_address=None, remote_port=None):
@@ -32,7 +32,7 @@ class edpsocket:
 		self.FINWAIT = 200
 		self.timers = {}
 		self.delayed_ack_timer = self.DELAYED_ACK_DELAY
-
+		self.flag_fin = False
 		#print("transmit finished")
 		#sending window parameters
 		self.snd_ini = 0 #Initial seq number
@@ -181,13 +181,18 @@ class edpsocket:
 
 
 	def _edp_fsm_CLOSE_RCV(self,packet,syscall,main_thread):
-		if packet and packet.fin:
+		if packet and packet.flags == 1:
+			if self.flag_fin == False:
+				self.rcv_nxt += 1
+				self.flag_fin = True
 			self._transmit_packet(packet_type=0b001)
+			self.FINWAIT = 20
+			return
 		if main_thread:
 			self.FINWAIT -= 1
 			if self.FINWAIT <= 0:
 				self.fsmstate = "CLOSED"
-				self.FINWAIT = 200
+				self.FINWAIT = 20
 
 
 
@@ -205,8 +210,11 @@ class edpsocket:
 			#ctr_length = len(self.controltype.keys())
 			#print(ctr_length)
 			packet_to_send.set_ctr_header(ctr_length=self.ctr_length, ctr_mech=self.controltype)
-		if ack:
-			packet_to_send.set_ack_header(ack=self.rcv_nxt, wnd=self.rcv_wnd - len(self.rxbuffer), flags= 1 if flag_fin else 0 , mMTU=self.rcv_mss)
+		if flag_ack:
+			fin = 1 if flag_fin else 0
+			fin = int(fin)
+			#print("fin",fin)
+			packet_to_send.set_ack_header(ack=self.rcv_nxt, wnd=self.rcv_wnd - len(self.rxbuffer), flags= fin , mMTU=self.rcv_mss)
 
 		if data:
 			packet_to_send.set_data_header(seq=seq, data_length=len(data), DAT=data)
@@ -216,7 +224,9 @@ class edpsocket:
 		with self.lock_socket:
 			self.udpsocket.sendto(packet_to_send.raw,self.address)
 		self.rcv_una = self.rcv_nxt
-		self.snd_nxt = seq + len(data) + (1  if flag_ctl else 0 )+ (1 if flag_fin else 0)
+		if not self.flag_fin:
+			self.snd_nxt = seq + len(data) + (1  if flag_ctl else 0 )+ (1 if flag_fin else 0)
+		self.flag_fin = flag_fin
 		print("snd_nxt: ",self.snd_nxt)
 		self.snd_max = max(self.snd_max,self.snd_nxt)
 		self.tx_buffer_seq_mod += flag_ctl + flag_fin
@@ -224,6 +234,7 @@ class edpsocket:
 		#In case packet caries FIN flag make note of its SEQ number
 		if flag_fin:
 			self.snd_fin = self.snd_nxt
+			print("flag_fin flags:",packet_to_send.flags)
 
 		# If in (SEMI-)CONNECTION state then reset ACK delay timer
 		if self.fsmstate == "SEMI_CONNECTED":
@@ -240,7 +251,7 @@ class edpsocket:
 
 
 	def _transmit_data(self):
-		close_sent = False
+		#close_sent = False
 		# add data to the send buffer
 		# if self.fsmstate == "CTL_SENT" and self.snd_nxt == self.snd_ini: #check if we need to (re)send inital control packet
 		# 	packet_to_send = self._transmit_packet(packet_type = 0b010)
@@ -264,9 +275,9 @@ class edpsocket:
 			self._transmit_packet(packet_type = 0b001)
 
 
-		if self.fsmstate in {"CLOSE_SENT"} and not close_sent:#check if we need to (re)transmit the final fin packet
-			self._transmit_packet(packet_type = 0b001, flag_fin = True)
-			close_sent = True
+		# if self.fsmstate in {"CLOSE_SENT"}:#check if we need to (re)transmit the final fin packet
+		# 	self._transmit_packet(packet_type = 0b001, flag_fin = True)
+			#close_sent = True
 	# def _control_sent_process(self,packet):
 	# 	if self._process_ack_packet()
 	# 		self.event_connect.release()
@@ -330,7 +341,7 @@ class edpsocket:
 		if self.snd_una in self.tx_retransmit_timeout_counter:
 			if self.timers[self.snd_una] <= 0:
 			#if the unacknowledged packet is timeout
-				if self.tx_retransmit_timeout_counter[self.snd_una] == self.PACKET_RETRANSMIT_MAX_COUNT:
+				if self.tx_retransmit_timeout_counter[self.snd_una] == PACKET_RETRANSMIT_MAX_COUNT:
 				#If in any state with established connection connection inform socket about connection failure
 					self._transmit_packet(flag_rst=True,packet_type=0b001)
 					if self.fsmstate in {"SEMI_CONNECTED","CLOSE_SENT"}:
@@ -465,10 +476,11 @@ class edpsocket:
 		#If it is in main_thread, transmit FIN packet
 		if main_thread:
 			self._retransmt_packet_timeout()
-			self._transmit_data()
+			self._transmit_packet(packet_type = 0b001, flag_fin = True)
 			return
 
-		if packet and (packet_type & 0b001): #receive ACK
+		if packet and (packet.packet_type & 0b001): #receive ACK
+			#print("123213123: ", self.snd_una, packet.ack, self.snd_max)
 			if self.snd_una <=packet.ack<=self.snd_max:
 				self._process_ack_packet(packet)
 				if packet.ack >= self.snd_fin:
