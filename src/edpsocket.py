@@ -5,7 +5,7 @@ import socket
 
 PACKET_RETRANSMIT_MAX_COUNT = 3 # If data is not acked, the maxi time to resend
 PACKET_RETRANSMIT_TIMEOUT = 1000 # Time to retransmit a packet if ACK not received
-TIME_INTERVAL = 1
+TIME_INTERVAL = 0.1
 
 class edpsocket:
 	def __init__(self, local_ip_address=None, local_port=None, remote_ip_address=None, remote_port=None):
@@ -112,7 +112,7 @@ class edpsocket:
 	def receive(self,byte_count = None):
 		self.event_rx_buffer.acquire() # wait till there is any data in the buffer
 
-		if not self.rxbuffer and self.state == "CLOSED":
+		if not self.rxbuffer and self.fsmstate == "CLOSED":
 			return None
 		with self.lock_rx_buffer:
 			if byte_count is None:
@@ -155,7 +155,7 @@ class edpsocket:
 			self.address = packet.source_address
 			self.snd_mss = 1024
 			self.snd_wnd = packet.wnd * self.snd_wsc
-			self.snd_wsc = pcket.wscale if None else 1 # if peer does not support window scaling, then set it to 1
+			self.snd_wsc = packet.wscale if None else 1 # if peer does not support window scaling, then set it to 1
 			self.snd_ewn = self.snd_mss
 			self.rcv_nxt = 1
 			self.fsmstate = "CTL_RCVD"
@@ -267,7 +267,7 @@ class edpsocket:
 				if transmit_data_len:
 					with self.lock_tx_buffer:
 						transmit_data = self.txbuffer[self.tx_buffer_nxt:self.tx_buffer_nxt + transmit_data_len]
-					print (transmit_data)
+					#print (transmit_data)
 					self._transmit_packet(packet_type = 0b100,data=bytes(transmit_data))
 					return
 
@@ -529,7 +529,7 @@ class edpsocket:
 			#print(data_stream)
 			packet = edppacket(1, None)
 			packet.bytes2packet(data_stream)
-			print(packet.packet_type)
+			#print(packet.packet_type)
 			packet.source_address = address
 			self.edp_fsm(packet=packet)
 	
