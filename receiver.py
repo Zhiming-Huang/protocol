@@ -1,6 +1,4 @@
-#!/usr/bin/env python3
-
-import src
+import src.edpsocket
 import sys
 
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import src
+import src.edppacket
 import sys
 
 rcv_ip = sys.argv[1]
