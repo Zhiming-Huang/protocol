@@ -144,7 +144,7 @@ class edpsocket:
 
 
 
-	def edp_fsm_listen(self,packet,syscall,main_thread):
+	def _edp_fsm_listen(self,packet,syscall,main_thread):
 		#if got an ctl packet, send ack packet to establish a half connection
 		if packet and packet.packet_type & 0b010:
 			self.address = packet.source_address
