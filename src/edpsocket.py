@@ -472,7 +472,7 @@ class edpsocket:
 			self.delayed_ack_timer -= 1
 			for name in self.timers:
 				self.timers[name] -= 1
-			edp_fsm(main_thread=True)
+			self.edp_fsm(main_thread=True)
 
 	
 	###### the followings are some funcitons to assist contol machanisms #############
