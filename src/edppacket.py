@@ -112,7 +112,7 @@ class edppacket(object):
           if self.packet_type & 0b100:
              temp = struct.pack('!LH', self.seq, self.data_length)
              self.raw = self.raw + temp
-             self.raw += self.DAT.encode()
+             self.raw += self.DAT
 
 
 
@@ -165,7 +165,7 @@ class edppacket(object):
             edp_data_header = packet[0:6]
             self.seq, self.data_length = struct.unpack('!LH',edp_data_header)
             packet = packet[6:]
-            self.DAT = packet.decode()
+            self.DAT = packet
 
     def generate_checksum(self):
         source_string = self.DAT
