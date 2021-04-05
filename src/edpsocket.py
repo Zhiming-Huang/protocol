@@ -397,7 +397,7 @@ class edpsocket:
 				if packet.ack == self.snd_nxt:
 					if packet.packet_type & 0b010:
 		    			# if got a ctl from peer, then transit to full_connected
-						self.transmit_packet(packet_type=0b001)
+						self._transmit_packet(packet_type=0b001)
 						self.fsmstate = "Full_Connected"
 					else:
 						self.fsmstate ="SEMI_CONNECTED"
