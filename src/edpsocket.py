@@ -8,7 +8,7 @@ PACKET_RETRANSMIT_TIMEOUT = 1000 # Time to retransmit a packet if ACK not receiv
 TIME_INTERVAL = 0.001
 
 class edpsocket:
-	def __init__(self, local_ip_address=None, local_port=None, remote_ip_address=None, remote_port=None, socket=None):
+	def __init__(self, local_ip_address=None, local_port=None, remote_ip_address=None, remote_port=None):
 		self.version = 1.0 #the version of edp
 		self.controltype = {'1':1,'2':0}
 		self.txbuffer = [] # Keeps data sent by application but not acknowledged by peer yet
@@ -64,8 +64,8 @@ class edpsocket:
 
 		self.closing = False  # Indicates that CLOSE syscall is in progress, this lets to finish sending data before FIN packet is transmitted
 		self.ooo_packet_queue = {}  # Out of order packet buffer
-		threading.Thread(target=run_fsm).start() #start the finite state machine for edp
-		threading.Thread(target=rx_edp).start() #keep receiving packets
+		threading.Thread(target=self.run_fsm).start() #start the finite state machine for edp
+		threading.Thread(target=self.rx_edp).start() #keep receiving packets
 
 		self.fsmstate = "CLOSED" #initially the connection is closed, 
 		# "SEMI_CONNECTED" for a harf connection from the sender to the receiver (i.e., sender can send data to the receiver)
