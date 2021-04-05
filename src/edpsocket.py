@@ -4,7 +4,7 @@ import time
 import socket
 
 PACKET_RETRANSMIT_MAX_COUNT = 3 # If data is not acked, the maxi time to resend
-PACKET_RETRANSMIT_TIMEOUT = 1000 # Time to retransmit a packet if ACK not received
+PACKET_RETRANSMIT_TIMEOUT = 300 # Time to retransmit a packet if ACK not received
 TIME_INTERVAL = 0.1
 
 class edpsocket:
@@ -28,7 +28,7 @@ class edpsocket:
 
 		self.connectiontype = {}
 		self.DELAYED_ACK_DELAY = 1
-		self.PACKET_RETRANSMIT_TIMEOUT = 200
+		#self.PACKET_RETRANSMIT_TIMEOUT = 200
 		self.FINWAIT = 200
 		self.timers = {}
 		self.delayed_ack_timer = self.DELAYED_ACK_DELAY
