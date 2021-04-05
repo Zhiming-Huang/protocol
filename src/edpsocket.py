@@ -82,7 +82,7 @@ class edpsocket:
 	def connection_coontrol_set(self,controltype):
 		self.controltype = controltype
 		#read from inputs
-		return connectiontype, controltype
+		return True
 
 	# def packetgeneration(packettype,controltype,data):
 
@@ -357,7 +357,7 @@ class edpsocket:
 	def _edp_fsm_CTL_SND(self,packet,syscall,main_thread):
 		if main_thread == True:
 			self._retransmt_packet_timeout()
-	    	self.transmit_data()
+	    	self._transmit_data()
 	    	return
 
 	    # If we get an ack packet 
