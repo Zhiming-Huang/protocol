@@ -1,6 +1,7 @@
 import edtpacket
 import threading
 import time
+import socket
 
 PACKET_RETRANSMIT_MAX_COUNT = 3 # If data is not acked, the maxi time to resend
 PACKET_RETRANSMIT_TIMEOUT = 1000 # Time to retransmit a packet if ACK not received
@@ -185,7 +186,7 @@ class edpsocket:
 
 
 
-	def _transmit_packet(self,seq=None,packet_type=None,flag_fin=False,controltype={}, data=''):
+	def _transmit_packet(self,seq=None,packet_type=None,flag_fin=False, data=''):
 		#send out data segment from TX buffer using sliding window mechanism
 
 		#global snd_nxt,snd_max,timers,timeout
@@ -195,6 +196,9 @@ class edpsocket:
 		flag_ack = packet_type & 0b001
 		ack = self.rcv_nxt if flag_ack else 0
 		packet_to_send = edppacket(version= self.version, packet_type = packet_type)
+		if flag_ctl:
+			ctr_length = len(self.controltype.values())
+			packet_to_send.set_ack_header(ctr_length=ctr_length, ctr_mech=self.controltype)
 		if ack:
 			packet_to_send.set_ack_header(ack=self.rcv_nxt, wnd=self.rcv_wnd - len(rx_buffer), flags=1, mMTU=self.rcv_mss)
 
