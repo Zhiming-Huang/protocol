@@ -511,6 +511,7 @@ class edpsocket:
 
 		if syscall == "CTL_UPDATE":
 			self.noerrorctl = 0 if 1 == self.controltype[0] else 1
+			print("SENT CONTROL UPDATE!")
 			self.fsmstate = "CTL_UPDATE_SENT"
 
 
