@@ -338,7 +338,8 @@ class edpsocket:
 	def _delayed_ack(self):
         #Run Delayed ACK mechanism
 		if self.delayed_ack_timer <= 0:
-			if self.rcv_nxt > self.rcv_una:
+			print("rcv_nxt and rcv_una", self.rcv_nxt, self.rcv_una)
+			#if self.rcv_nxt > self.rcv_una:
 				self._transmit_packet(packet_type=0b001)
 			self.delayed_ack_timer = self.DELAYED_ACK_DELAY
 
