@@ -400,7 +400,7 @@ class edpsocket:
 
 
 				if packet.packet_type & 0b100: #if received a data packet
-					if packet.seq == self.rcv_nxt:
+					#if packet.seq == self.rcv_nxt:
 						self.fsmstate = "SEMI_CONNECTED"
 						self._process_ack_packet(packet)
 						self.event_connect.release()
