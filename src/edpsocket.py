@@ -31,7 +31,7 @@ class edpsocket:
 		self.connectiontype = {}
 		self.DELAYED_ACK_DELAY = 1
 		#self.PACKET_RETRANSMIT_TIMEOUT = 200
-		self.FINWAIT = 200
+		self.FINWAIT = 10
 		self.timers = {}
 		self.delayed_ack_timer = self.DELAYED_ACK_DELAY
 		self.flag_fin = False
