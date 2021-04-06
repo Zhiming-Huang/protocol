@@ -409,7 +409,7 @@ class edpsocket:
 		else:
 		# for main_thread, resend ACK if its timer expired
 			if packet:
-				#print("Packet receive")
+				print("Packet receive")
 				if packet.packet_type & 0b010: #if receive ctl again, which means the former ack is not received
 					self._transmit_packet(packet_type=0b001)
 
@@ -558,7 +558,7 @@ class edpsocket:
 			#print("123213123: ", self.snd_una, packet.ack, self.snd_max)
 			if self.snd_una <=packet.ack<=self.snd_max:
 				self._process_ack_packet(packet)
-				if packet.ack >= self.snd_fin:
+				if packet.ack >= self.snd_nxt:
 					self.fsmstate = "CLOSED"
 					np.save("send_seq_list.npy",self.seqlist)
 
