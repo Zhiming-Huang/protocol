@@ -6,7 +6,7 @@ import socket
 
 PACKET_RETRANSMIT_MAX_COUNT = 3 # If data is not acked, the maxi time to resend
 PACKET_RETRANSMIT_TIMEOUT = 300 # Time to retransmit a packet if ACK not received
-TIME_INTERVAL = 0.1
+TIME_INTERVAL = 1
 
 class edpsocket:
 	def __init__(self, local_ip_address=None, local_port=None, remote_ip_address=None, remote_port=None):
