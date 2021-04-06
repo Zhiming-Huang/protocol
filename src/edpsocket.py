@@ -172,21 +172,6 @@ class edpsocket:
 			return 
 
 
-	def _edp_fsm_CLOSE_RCV(self,packet,syscall,main_thread):
-		if packet and packet.flags == 1:
-			if self.flag_fin == False:
-				self.rcv_nxt += 1
-				self.flag_fin = True
-			self._transmit_packet(packet_type=0b001)
-			self.FINWAIT = 20
-			return
-		if main_thread:
-			self.FINWAIT -= 1
-			if self.FINWAIT <= 0:
-				self.fsmstate = "CLOSED"
-				np.save("receive_seq_list.npy",self.seqlist)
-				self.FINWAIT = 20
-
 
 
 	def _transmit_packet(self,seq=None,packet_type=None,flag_fin=False, data=b'',flag_rst=False):
@@ -475,14 +460,15 @@ class edpsocket:
 				self._retransmt_packet_timeout()
 				self._delayed_ack()
 			print("Remaining data to send:",len(self.txbuffer))
-			if self.closing and not self.txbuffer: #if finish sending out all data
-				self.fsmstate = "CLOSE_SENT"
+
         
 
 		if packet and packet.packet_type & 0b001: #if got ACK packet
 			print("got ack", packet.ack, self.snd_nxt)
 			if not (packet.packet_type & 0b010) and not (packet.flags == 1): #if the ack packet is not ctl or fin packet
          		#suspected retransmission request -> reset TX window and local seq number
+				if self.closing and not self.txbuffer: #if finish sending out all data
+					self.fsmstate = "CLOSE_SENT"
 				if packet.ack == self.snd_una and not (packet.packet_type & 0b100):
 					print(packet.flags)
 					self._retransmit_packet_request(packet)
@@ -551,16 +537,41 @@ class edpsocket:
 		#If it is in main_thread, transmit FIN packet
 		if main_thread:
 			self._retransmt_packet_timeout()
+			self.rcv_nxt = self.snd_nxt
 			self._transmit_packet(packet_type = 0b001, flag_fin = True)
 			return
 
 		if packet and (packet.packet_type & 0b001): #receive ACK
 			#print("123213123: ", self.snd_una, packet.ack, self.snd_max)
-			if self.snd_una <=packet.ack<=self.snd_max:
-				self._process_ack_packet(packet)
-				if packet.ack >= self.snd_nxt:
+			#if self.snd_una <=packet.ack<=self.snd_max:
+			#	self._process_ack_packet(packet)
+			#	print("print nxt and fin",self.snd_nxt,self.snd_fin)
+			print("received!!!!",self.snd_fin)
+			if self.snd_fin:
+				print("print nxt and fin",packet.ack,self.snd_fin)
+				if packet.ack >= self.snd_fin:
 					self.fsmstate = "CLOSED"
 					np.save("send_seq_list.npy",self.seqlist)
+
+
+	def _edp_fsm_CLOSE_RCV(self,packet,syscall,main_thread):
+		if packet and packet.flags == 1:
+			print("received!!")
+			#if self.flag_fin == False:
+
+			self.rcv_nxt = packet.ack 
+			print("rcv_nxt", packet.seq,self.rcv_nxt)
+			#self.flag_fin = True
+			self._transmit_packet(packet_type=0b001)
+			self.FINWAIT = 20
+			return
+		if main_thread:
+			self.FINWAIT -= 1
+			if self.FINWAIT <= 0:
+				self.fsmstate = "CLOSED"
+				np.save("receive_seq_list.npy",self.seqlist)
+				self.FINWAIT = 20
+
 
 
 
