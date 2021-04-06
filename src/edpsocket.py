@@ -322,7 +322,7 @@ class edpsocket:
 			self.rcv_nxt = packet.seq + len(packet.DAT)
 			if packet.seq not in self.seqlist:
 				self.seqlist.append(packet.seq)
-			self._enqueue_rx_buffer(packet.DAT)
+				self._enqueue_rx_buffer(packet.DAT)
 
 			#purge expired rx retransmit requests
 			for seq in list(self.rx_retransmit_request_counter):
@@ -394,6 +394,7 @@ class edpsocket:
 			if main_thread:
 				#self.snd_nxt = self.snd_una
 				self._transmit_packet(packet_type=0b001)
+
 				self.fsmstate = "SEMI_CONNECTED"
 
 			if packet:
@@ -467,10 +468,10 @@ class edpsocket:
 	def  _edp_fsm_SEMI_CONNECTED(self,packet,syscall,main_thread):
 		#the main_thread event -> send out data and run mechanisms such as delayd ack mechanism
 		if main_thread:
-			self._retransmt_packet_timeout()
 			self._transmit_data()
 			print(self.noerrorctl)
 			if not self.noerrorctl:
+				self._retransmt_packet_timeout()
 				self._delayed_ack()
 			print("Remaining data to send:",len(self.txbuffer))
 			if self.closing and not self.txbuffer: #if finish sending out all data
@@ -500,10 +501,12 @@ class edpsocket:
 
 		if packet and (packet.packet_type & 0b100): #if got data packet
          			#to be finished in the receiver side
-			if self.rcv_nxt > 14000 and self.modify_times:
+			if packet.seq > 12000 and self.modify_times:
+				self._process_ack_packet(packet)
 				self.control_modify([1,1])
 				self.ctr_length = 1
-			if packet.seq > self.rcv_nxt: #got a higher seq than we expected
+
+			if packet.seq > self.rcv_nxt and not self.noerrorctl: #got a higher seq than we expected
 				self.ooo_packet_queue[packet.seq] = packet
 				self.rx_retransmit_request_counter[self.rcv_nxt] = self.rx_retransmit_request_counter.get(self.rcv_nxt,0) + 1
 				if self.rx_retransmit_request_counter[self.rcv_nxt] <= 2:
@@ -514,6 +517,9 @@ class edpsocket:
 			if packet.seq == self.rcv_nxt or self.noerrorctl: #regular packets
 				self._process_ack_packet(packet)
 				return
+
+			if not self.noerrorctl:
+				self._process_ack_packet(packet)
 			return
 
 		if packet and packet.flags==1: #receive a packet with the fin field set
