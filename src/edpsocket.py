@@ -14,10 +14,11 @@ class edpsocket:
 		self.version = 1  #the version of edp
 		self.ctr_length = 1
 		self.controltype = [2,1]
-		self.noerrorctl = 0 if 1 == self.controltype[0] else 1 #
+		self.noerrorctl = 1 #
 		self.txbuffer = [] # Keeps data sent by application but not acknowledged by peer yet
 		self.rxbuffer = [] # Keeps data received from peer and not received by application yet
 		#uakbuffer = [] #keeps track the packet that is not acknowledged
+		self.receiving = False
 		self.udpsocket = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
 		self.fsmstate = "CLOSED" #initially the connection is closed, 
 		#"SND_CONNECTED" for single-directed connection from sender to the receiver (i.e., sender can send data to the receiver)
@@ -54,6 +55,7 @@ class edpsocket:
 		self.rcv_mss = 1024 #maximum segment size
 		self.rcv_wnd = 65535 # window size
 		self.rcv_wsc = 1 # Window scale
+		self.modify_times = True
 
 
 		self.tx_retransmit_timeout_counter = {}  # Keeps track of the timestamps for the sent out packets, used to determine when to retransmit packet
@@ -81,6 +83,7 @@ class edpsocket:
 
 	def listen(self):
 		self.edp_fsm(syscall = "LISTEN")
+		self.receiving = True
 		self.event_connect.acquire()
 		return self.fsmstate == "SEMI_CONNECTED" 
 
@@ -139,6 +142,7 @@ class edpsocket:
 	def control_modify(self, connectiontype):
 		if self.fsmstate in {"SEMI_CONNECTED","CONNECTED"}:
 			self.connectiontype = connectiontype
+			self.modify_times = False
 			self.edp_fsm(syscall = "CTL_UPDATE")
 
 	######################### The followings are codes for FSM ############################## 
@@ -167,32 +171,6 @@ class edpsocket:
 			self.fsmstate = "CLOSED"
 			return 
 
-	def _edp_fsm_CTL_RCV(self,packet,syscall,main_thread):
-		if self.fsmstate == "CTL_UPDATE_CFM":
-			if main_thread:
-				self._transmit_data(flag_ack=True)
-
-			if packet:
-				if packet.packet_type == 0b001:
-					print("Updating Confirmed, go back to SEMI_CONNECTED state!")
-					self._process_ack_packet(packet)
-					self.fsmstate = "SEMI_CONNECTED"
-
-
-		else:
-		# for main_thread, resend ACK if its timer expired
-			if packet:
-				#print("Packet receive")
-				if packet.packet_type & 0b010: #if receive ctl again, which means the former ack is not received
-					self._transmit_packet(packet_type=0b001)
-
-
-			if packet and packet.packet_type & 0b100: #if received a data packet
-				if packet.seq == self.rcv_nxt:
-					self.fsmstate = "SEMI_CONNECTED"
-					self._process_ack_packet(packet)
-					self.event_connect.release()
-
 
 	def _edp_fsm_CLOSE_RCV(self,packet,syscall,main_thread):
 		if packet and packet.flags == 1:
@@ -211,7 +189,7 @@ class edpsocket:
 
 
 
-	def _transmit_packet(self,seq=None,packet_type=None,flag_fin=False, data='',flag_rst=False):
+	def _transmit_packet(self,seq=None,packet_type=None,flag_fin=False, data=b'',flag_rst=False):
 		#send out data segment from TX buffer using sliding window mechanism
 
 		#global snd_nxt,snd_max,timers,timeout
@@ -275,10 +253,13 @@ class edpsocket:
 		# 	return
 
 
-		if self.fsmstate in {"SEMI_CONNECTED"}: #check if we are in the state that allows sending data out
+		if self.fsmstate in {"SEMI_CONNECTED","CTL_UPDATE_CFM"} and not self.receiving: #check if we are in the state that allows sending data out
 			remaining_data_len = len(self.txbuffer) - self.tx_buffer_nxt
-			usable_window = self.snd_ewn - self.tx_buffer_nxt
-			transmit_data_len = min(self.snd_mss, usable_window, remaining_data_len)
+			if not self.noerrorctl:
+				usable_window = self.snd_ewn - self.tx_buffer_nxt
+				transmit_data_len = min(self.snd_mss, usable_window, remaining_data_len)
+			else:
+				transmit_data_len = min(self.snd_mss, remaining_data_len)
 			print("transmit data length,", self.snd_nxt,transmit_data_len)
 			if remaining_data_len:
 				if transmit_data_len:
@@ -287,6 +268,7 @@ class edpsocket:
 					#print (transmit_data)
 					if flag_ack:
 						self._transmit_packet(packet_type = 0b101,data=bytes(transmit_data))
+						print("send ack")
 					else:
 						self._transmit_packet(packet_type = 0b100,data=bytes(transmit_data))
 					return
@@ -308,6 +290,7 @@ class edpsocket:
 	def _process_ack_packet(self,packet):
 		# process data/ack packet when the connection is established
 		if packet.packet_type & 0b001:
+			print("I am here !!!!!!!!!!!!!!!!!!!!!!!!")
 			self.snd_una = max(self.snd_una,packet.ack) #record the local seq that has been acked by peer
 			if self.snd_nxt < self.snd_una <= self.snd_max:
 				self.snd_nxt = self.snd_una
@@ -350,8 +333,9 @@ class edpsocket:
 			packet = self.ooo_packet_queue.pop(self.rcv_nxt,None)
 			if packet:
 				self.edp_fsm(packet)
-			if self.rcv_nxt > 14000:
-				self.control_modify([1,2,2,1])
+			if self.rcv_nxt > 14000 and self.modify_times:
+				self.control_modify([1,1])
+				self.ctr_length = 1
 		
 	def _delayed_ack(self):
         #Run Delayed ACK mechanism
@@ -407,23 +391,54 @@ class edpsocket:
 		if syscall == "LISTEN":
 			self.fsmstate = "LISTEN"
 
+	def _edp_fsm_CTL_RCV(self,packet,syscall,main_thread):
+		if self.fsmstate == "CTL_UPDATE_CFM":
+			if main_thread:
+				#self.snd_nxt = self.snd_una
+				self._transmit_packet(packet_type=0b001)
+				self.fsmstate = "SEMI_CONNECTED"
 
+			if packet:
+				print("Received packets!!!!!!")
+				if packet.packet_type & 0b001:
+					print("Updating Confirmed, go back to SEMI_CONNECTED state!")
+					self._process_ack_packet(packet)
+					self.fsmstate = "SEMI_CONNECTED"
+
+
+		else:
+		# for main_thread, resend ACK if its timer expired
+			if packet:
+				#print("Packet receive")
+				if packet.packet_type & 0b010: #if receive ctl again, which means the former ack is not received
+					self._transmit_packet(packet_type=0b001)
+
+
+				if packet.packet_type & 0b100: #if received a data packet
+					if packet.seq == self.rcv_nxt:
+						self.fsmstate = "SEMI_CONNECTED"
+						self._process_ack_packet(packet)
+						self.event_connect.release()
 
 	def _edp_fsm_CTL_SND(self,packet,syscall,main_thread):
 		if self.fsmstate == "CTL_UPDATE_SENT":
 			if main_thread:
-				_transmit_packet(packet_type=0b011)
-				time.sleep(10)
+				self._transmit_packet(packet_type=0b011)
+				
+				#time.sleep(1)
 
 			if packet:
-				if packet_type & 0b100 and packet_type & 0b001:
+				print("Recived a packet: ",packet.packet_type,packet.packet_type == 1)
+				if packet.packet_type & 0b001:
+					print("got here to semi connected")
 					self.fsmstate = "SEMI_CONNECTED" #Actually now it is in the fully connected stage
 					self.edp_fsm(packet)
 
 		else:
-			if main_thread == True:
+			if main_thread:
 				self._retransmt_packet_timeout()
 				self._transmit_packet(packet_type=0b010)
+				self.snd_nxt = 1
 				return
 
 		    # If we get an ack packet 
@@ -456,6 +471,7 @@ class edpsocket:
 		if main_thread:
 			self._retransmt_packet_timeout()
 			self._transmit_data()
+			print(self.noerrorctl)
 			if not self.noerrorctl:
 				self._delayed_ack()
 			print("Remaining data to send:",len(self.txbuffer))
@@ -476,7 +492,9 @@ class edpsocket:
 					return
 			if packet.packet_type & 0b010:
 				self.controltype = packet.ctr_mech
-				self.noerrorctl = 0 if 1 == self.controltype[0] else 1
+				self.noerrorctl = 0
+				print("noerrorctl", self.noerrorctl)
+				self._process_ack_packet(packet)
 				self.fsmstate = "CTL_UPDATE_CFM"
 
 
@@ -510,8 +528,8 @@ class edpsocket:
 			return
 
 		if syscall == "CTL_UPDATE":
-			self.noerrorctl = 0 if 1 == self.controltype[0] else 1
-			print("SENT CONTROL UPDATE!")
+			self.noerrorctl = 0
+			print("SENT CONTROL UPDATE! ", self.noerrorctl)
 			self.fsmstate = "CTL_UPDATE_SENT"
 
 
