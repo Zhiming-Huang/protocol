@@ -333,9 +333,7 @@ class edpsocket:
 			packet = self.ooo_packet_queue.pop(self.rcv_nxt,None)
 			if packet:
 				self.edp_fsm(packet)
-			if self.rcv_nxt > 14000 and self.modify_times:
-				self.control_modify([1,1])
-				self.ctr_length = 1
+
 		
 	def _delayed_ack(self):
         #Run Delayed ACK mechanism
@@ -502,8 +500,11 @@ class edpsocket:
 
 		if packet and (packet.packet_type & 0b100): #if got data packet
          			#to be finished in the receiver side
+			if self.rcv_nxt > 14000 and self.modify_times:
+				self.control_modify([1,1])
+				self.ctr_length = 1
 			if packet.seq > self.rcv_nxt: #got a higher seq than we expected
-				self.ooo_packet_queue[paket.seq] = packet
+				self.ooo_packet_queue[packet.seq] = packet
 				self.rx_retransmit_request_counter[self.rcv_nxt] = self.rx_retransmit_request_counter.get(self.rcv_nxt,0) + 1
 				if self.rx_retransmit_request_counter[self.rcv_nxt] <= 2:
 					self._transmit_packet(packet_type = 0b001)
