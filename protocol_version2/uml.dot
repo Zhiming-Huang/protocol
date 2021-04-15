@@ -1,0 +1,77 @@
+digraph G {
+fontname = "Bitstream Vera Sans"
+fontsize = 8
+
+node [
+fontname = "Bitstream Vera Sans"
+fontsize = 8
+shape = "record"
+]
+
+edge [
+fontname = "Bitstream Vera Sans"
+fontsize = 8
+]
+
+UDPsocket [
+label = "{UDP socket| + local_ip_address : ipv4\l + local_port : portID\l + remote_ip_address:ipv4\l + remote_port : portID\l|+ __init__() : none\l + socket_id() : locol/remote address[]\l + bind(local_ip_address, local port):none\l + sendto(packet):none\l + receivefrom(timeout=none):none\l + close():none\l}"
+]
+
+edpsocket [
+label = "{edpsocket| + | + socket_id() : locol/remote address[]\l + bind(local_ip_address, local port):none\l +listen() : void\l + connect(remote_ip_address, remote_port) : none\l + accept() : none\l + receive(byte_count) : data_rx bit_flow\l + send(data_segment) : none\l + close(): none\l}"
+]
+
+State [
+label = "{State|-current_state : state\l |+getstate(): state\l +handl()\l}"
+]
+
+CLOSED [
+label = "{CLOSED |-current_state : CLOSED\l | + getstate(): state\l + handle(EVENT=0, packet=0, edp_entity): \l }"
+]
+
+LISTEN [
+label = "{LISTEN |-current_state : CLOSED\l | + getstate(): state\l + handl():\l}"
+]
+
+CTL_RCVD [
+label = "{CTL_RCVD |-current_state : CLOSED\l | + getstate(): state\l + handl():\l}"
+]
+
+CTL_SEND [
+label = "{CTL_SEND |-current_state : CLOSED\l | + getstate(): state\l + handl():\l}"
+]
+
+HALF_CONNECTED [
+label = "{CLOSED |-current_state : CLOSED\l | + getstate(): state\l + handl():\l}"
+]
+
+CONNECTED [
+label = "{CLOSED |-current_state : CLOSED\l | + getstate(): state\l + handl():\l}"
+]
+
+CLOSE_SENT [
+label = "{CLOSED |-current_state : CLOSED\l | + getstate(): state\l + handl():\l}"
+]
+
+CLOSE_RCV [
+label = "{CLOSED |-current_state : CLOSED\l | + getstate(): state\l + handl():\l}"
+]
+
+edge [
+arrowhead = "empty"
+]
+
+edpsocket -> UDPsocket
+
+CLOSED -> State
+LISTEN -> State
+CTL_RCVD -> State
+CTL_SEND -> State
+HALF_CONNECTED -> State
+CONNECTED -> State
+CLOSE_SENT -> State
+CLOSE_RCV -> State
+
+edpsocketentity []
+
+}
